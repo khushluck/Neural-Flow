@@ -1,0 +1,168 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Neural Flow</title>
+<style>
+  :root{--bg:#0f1117;--card:#171a23;--line:#262b38;--text:#dde2ee;--mut:#8a93a6;--acc:#289b9e;--acc2:#5a3697;--bad:#c0505a}
+  *{box-sizing:border-box} html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,Segoe UI,sans-serif}
+  body{display:flex}
+  nav{width:190px;padding:18px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+  nav h1{font-size:16px;margin:0 8px 14px;background:linear-gradient(90deg,#289B9E,#8f6bd6);-webkit-background-clip:text;color:transparent}
+  nav button{all:unset;cursor:pointer;padding:8px 10px;border-radius:8px;color:var(--mut)}
+  nav button:hover{background:var(--card)} nav button.on{background:var(--card);color:var(--text);box-shadow:inset 3px 0 var(--acc)}
+  main{flex:1;display:flex;flex-direction:column;min-width:0}
+  #panes{flex:1;overflow:auto;padding:22px 28px}
+  .pane{display:none;max-width:640px} .pane.on{display:block}
+  h2{margin:0 0 14px;font-size:18px} h3{margin:22px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+  label{display:block;margin:12px 0 4px;font-weight:600} .hint{color:var(--mut);font-size:12px;margin:3px 0 0}
+  input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+  textarea{min-height:130px;font:13px/1.5 ui-monospace,Consolas,monospace;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:1px solid var(--acc)}
+  .row{display:flex;gap:8px;align-items:center} .row>*:first-child{flex:1}
+  .chk{display:flex;gap:10px;align-items:flex-start;margin:12px 0} .chk input{margin-top:4px} .chk b{display:block}
+  button.btn{cursor:pointer;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font:inherit}
+  button.btn:hover{border-color:var(--acc)} button.pri{background:linear-gradient(90deg,#289B9E,#5A3697);border:0;color:#fff;font-weight:600}
+  footer{padding:12px 28px;border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;justify-content:flex-end}
+  #msg{color:var(--mut);flex:1} .ok{color:#5fd1a0}.err{color:var(--bad)}
+  .hist{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+  .hist small{color:var(--mut)} .hist p{margin:6px 0;white-space:pre-wrap} .hist .row{gap:6px;justify-content:flex-end}
+  a{color:var(--acc);cursor:pointer} code{background:var(--card);padding:1px 5px;border-radius:5px}
+  [data-for]{display:none}
+</style>
+<nav id="nav">
+  <h1>Neural Flow</h1>
+  <button data-tab="general">General</button><button data-tab="cleanup">AI cleanup</button><button data-tab="words">Dictionary &amp; snippets</button>
+  <button data-tab="history">History</button><button data-tab="offline">Offline mode</button><button data-tab="about">About</button>
+</nav>
+<main>
+<div id="panes">
+
+<section class="pane" id="general"><h2>General</h2>
+  <label>Speech-to-text provider</label>
+  <select data-k="provider"><option value="groq">Groq Whisper — free tier (recommended)</option><option value="openai">OpenAI</option><option value="nvidia">NVIDIA Riva</option><option value="local">Offline (whisper.cpp)</option></select>
+
+  <div data-for="groq"><label>Groq API key</label>
+    <div class="row"><input type="password" data-k="keys.groq" placeholder="gsk_…"><button class="btn" data-test="groq">Test</button></div>
+    <p class="hint">Free, no card: <a data-link="https://console.groq.com/keys">console.groq.com/keys</a>. Used for transcription and AI cleanup.</p></div>
+  <div data-for="openai"><label>OpenAI API key</label>
+    <div class="row"><input type="password" data-k="keys.openai" placeholder="sk-…"><button class="btn" data-test="openai">Test</button></div></div>
+  <div data-for="nvidia"><label>NVIDIA API key</label><input type="password" data-k="keys.nvidia" placeholder="nvapi-…">
+    <label>ASR function ID</label><input type="text" data-k="nvidia.functionId"><label>Language code</label><input type="text" data-k="nvidia.lang" placeholder="en-US"></div>
+  <div data-for="groq,openai"><label>Model override <span class="hint">(optional)</span></label><input type="text" data-k="sttModel" placeholder="whisper-large-v3-turbo"></div>
+
+  <label>Spoken language</label>
+  <select data-k="language"><option value="">Auto-detect (good for English / Hinglish)</option><option value="en">English</option><option value="hi">Hindi</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="pt">Portuguese</option><option value="ar">Arabic</option><option value="ja">Japanese</option></select>
+  <p class="hint">Hindi forced with <code>hi</code> usually comes out in Devanagari. Keep Auto and tick "Hinglish in Roman letters" under AI cleanup for Roman Hinglish.</p>
+
+  <h3>Hotkey</h3>
+  <select data-k="hotkey"><option value="CtrlRight">Right Ctrl</option><option value="AltRight">Right Alt / Right Option</option><option value="ShiftRight">Right Shift</option><option value="F8">F8</option><option value="F9">F9</option><option value="F10">F10</option></select>
+  <p class="hint">Hold to talk. Esc cancels a recording. Right Ctrl is the safest on Windows (a lone Alt tap can focus an app's menu bar).</p>
+  <div class="chk"><input type="checkbox" data-k="doubleTapLock" id="c1"><label for="c1" style="margin:0"><b>Hands-free mode</b>Double-tap the hotkey to keep recording without holding it; tap once more to finish.</label></div>
+
+  <h3>Behaviour</h3>
+  <div class="chk"><input type="checkbox" data-k="voiceCommands" id="c2"><label for="c2" style="margin:0"><b>Voice commands</b>Say “comma”, “question mark”, “new line”, “new paragraph”; or alone: “delete that”, “press enter”, “select all”.</label></div>
+  <div class="chk"><input type="checkbox" data-k="keepInClipboard" id="c3"><label for="c3" style="margin:0"><b>Keep dictated text on the clipboard</b>Off = your previous clipboard is restored after pasting. Turn on if you often dictate with no text box focused.</label></div>
+  <div class="chk"><input type="checkbox" data-k="launchAtLogin" id="c4"><label for="c4" style="margin:0"><b>Start with the computer</b>Only applies to the installed app.</label></div>
+</section>
+
+<section class="pane" id="cleanup"><h2>AI cleanup</h2>
+  <div class="chk"><input type="checkbox" data-k="cleanup.enabled" id="d1"><label for="d1" style="margin:0"><b>Clean up my speech</b>Removes “um/uh/matlab”, fixes punctuation, keeps your meaning. Uses your Groq (or OpenAI) key, adds ~0.5 s.</label></div>
+  <label>Default tone</label>
+  <select data-k="tone"><option value="neutral">Neutral</option><option value="casual">Casual (chat)</option><option value="formal">Formal (email)</option><option value="code">Code / technical</option></select>
+  <div class="chk"><input type="checkbox" data-k="cleanup.hinglishRoman" id="d2"><label for="d2" style="margin:0"><b>Hinglish in Roman letters</b>Never output Devanagari; Hindi words stay as “kaise ho”.</label></div>
+  <label>Skip cleanup for short phrases (fewer than N words)</label><input type="number" min="1" max="30" data-k="cleanup.minWords">
+  <label>Cleanup model</label><input type="text" data-k="cleanup.model" placeholder="llama-3.1-8b-instant">
+  <h3>Per-app tone</h3>
+  <textarea data-k="appRules" spellcheck="false"></textarea>
+  <p class="hint">One rule per line: <code>app=tone</code> (matches the program name, e.g. <code>slack=casual</code>) or <code>title:gmail=formal</code> (matches the window title). Tones: neutral, casual, formal, code.</p>
+</section>
+
+<section class="pane" id="words"><h2>Dictionary &amp; snippets</h2>
+  <h3>Personal dictionary</h3>
+  <textarea data-k="dictionary" spellcheck="false" placeholder="NeuralSyntax&#10;Claude Code&#10;neural syntax => NeuralSyntax"></textarea>
+  <p class="hint">One entry per line. A plain word teaches the recogniser the spelling. <code>heard =&gt; Right</code> force-fixes a recurring mistake.</p>
+  <h3>Snippets</h3>
+  <textarea data-k="snippets" spellcheck="false" placeholder="my email => you@example.com&#10;yt intro => Hey guys, welcome back to NeuralSyntax!\nToday we’re…"></textarea>
+  <p class="hint">Say the trigger on its own (optionally “insert …”) and the full text is typed. <code>\n</code> = new line.</p>
+</section>
+
+<section class="pane" id="history"><h2>History</h2>
+  <div class="row" style="margin-bottom:8px"><span class="hint">Your last dictations, saved only on this computer. Click Copy if anything failed to paste.</span><button class="btn" id="clr">Clear all</button></div>
+  <div id="histList"></div>
+</section>
+
+<section class="pane" id="offline"><h2>Offline mode (whisper.cpp)</h2>
+  <p class="hint">Runs Whisper on your own computer: no internet, no limits, nothing leaves your PC. Choose “Offline (whisper.cpp)” as the provider on the General tab after setting these up.</p>
+  <ol class="hint"><li>Download a <b>whisper.cpp release</b> for your OS from <a data-link="https://github.com/ggml-org/whisper.cpp/releases">github.com/ggml-org/whisper.cpp/releases</a> and unzip it.</li>
+  <li>Download a model such as <b>ggml-base.bin</b> (or <b>ggml-small.bin</b> for better accuracy) from <a data-link="https://huggingface.co/ggerganov/whisper.cpp/tree/main">huggingface.co/ggerganov/whisper.cpp</a>.</li><li>Point to both files below.</li></ol>
+  <label>whisper.cpp program (<code>whisper-cli.exe</code>)</label><div class="row"><input type="text" data-k="local.binary"><button class="btn" data-pick="local.binary">Browse…</button></div>
+  <label>Model file (<code>ggml-….bin</code>)</label><div class="row"><input type="text" data-k="local.model"><button class="btn" data-pick="local.model">Browse…</button></div>
+  <label>CPU threads</label><input type="number" min="1" max="32" data-k="local.threads">
+  <p class="hint">Offline AI cleanup still needs a Groq/OpenAI key; turn cleanup off for a fully offline setup.</p>
+</section>
+
+<section class="pane" id="about"><h2>About</h2>
+  <p>Neural Flow <span id="ver"></span> — free, open-source voice dictation for any app.</p>
+  <p class="hint">Settings and history are stored in <code id="dir"></code>. API keys are encrypted with your operating system's secure storage when available. Audio is sent only to the provider you choose (or nowhere in offline mode).</p>
+</section>
+</div>
+<footer><span id="msg"></span><button class="btn pri" id="save">Save</button></footer>
+</main>
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const get = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
+function set(o, p, v) { const ks = p.split('.'); ks.slice(0, -1).reduce((a, k) => (a[k] ??= {}), o)[ks.at(-1)] = v; }
+const say = (t, cls = '') => { const m = $('#msg'); m.className = cls; m.textContent = t; if (t) setTimeout(() => { if (m.textContent === t) m.textContent = ''; }, 3500); };
+
+function tab(name) {
+  $$('.pane').forEach((p) => p.classList.toggle('on', p.id === name));
+  $$('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  if (name === 'history') loadHistory();
+}
+function applyProvider() {
+  const p = $('[data-k="provider"]').value;
+  $$('[data-for]').forEach((e) => { e.style.display = e.dataset.for.split(',').includes(p) ? 'block' : 'none'; });
+}
+async function load() {
+  const { settings, version, dataDir } = await nf.getSettings();
+  $$('[data-k]').forEach((el) => {
+    const v = get(settings, el.dataset.k);
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
+  });
+  $('#ver').textContent = 'v' + version; $('#dir').textContent = dataDir;
+  applyProvider();
+}
+function collect() {
+  const patch = {};
+  $$('[data-k]').forEach((el) => set(patch, el.dataset.k, el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value));
+  return patch;
+}
+async function loadHistory() {
+  const list = await nf.getHistory(), box = $('#histList'); box.textContent = '';
+  if (!list.length) { box.innerHTML = '<p class="hint">Nothing yet — hold your hotkey and speak.</p>'; return; }
+  for (const h of list) {
+    const d = document.createElement('div'); d.className = 'hist';
+    const meta = document.createElement('small'); meta.textContent = `${new Date(h.ts).toLocaleString()}${h.app ? ' · ' + h.app : ''}${h.cleaned ? ' · cleaned' : ''}${h.kind === 'snippet' ? ' · snippet' : ''}`;
+    const p = document.createElement('p'); p.textContent = h.text;
+    const r = document.createElement('div'); r.className = 'row';
+    const cp = Object.assign(document.createElement('button'), { className: 'btn', textContent: 'Copy' });
+    cp.onclick = async () => { await nf.copy(h.text); cp.textContent = 'Copied ✓'; };
+    const del = Object.assign(document.createElement('button'), { className: 'btn', textContent: 'Delete' });
+    del.onclick = async () => { await nf.deleteHistory(h.id); loadHistory(); };
+    r.append(cp, del); d.append(meta, p, r); box.append(d);
+  }
+}
+
+$('#nav').onclick = (e) => { const b = e.target.closest('button'); if (b) tab(b.dataset.tab); };
+$('[data-k="provider"]').onchange = applyProvider;
+$('#save').onclick = async () => { await nf.saveSettings(collect()); say('Saved ✓', 'ok'); };
+$('#clr').onclick = async () => { if (confirm('Delete all history?')) { await nf.clearHistory(); loadHistory(); } };
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-test]'), l = e.target.closest('[data-link]'), p = e.target.closest('[data-pick]');
+  if (l) nf.openExternal(l.dataset.link);
+  if (t) { say('Testing…'); const prov = t.dataset.test; const r = await nf.testKey({ provider: prov, key: $(`[data-k="keys.${prov}"]`).value }); say(r.message, r.ok ? 'ok' : 'err'); }
+  if (p) { const f = await nf.pickFile('Choose file'); if (f) $(`[data-k="${p.dataset.pick}"]`).value = f; }
+});
+nf.onTab(tab);
+load().then(() => tab(new URLSearchParams(location.search).get('tab') || 'general'));
+</script>

@@ -1,0 +1,194 @@
+<p align="center">
+  <img src="assets/icon.png" alt="Neural Flow logo" width="128" height="128">
+</p>
+
+<h1 align="center">Neural Flow</h1>
+
+<p align="center">
+  <b>Hold a key. Speak. Clean text appears wherever you're typing.</b><br>
+  Free, open-source voice dictation for any app on your desktop.
+</p>
+
+<p align="center">
+  <a href="https://github.com/YOUR-USERNAME/neural-flow/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/YOUR-USERNAME/neural-flow?style=flat-square&color=289b9e"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-5a3697?style=flat-square"></a>
+  <img alt="Platform: Windows" src="https://img.shields.io/badge/platform-Windows-2f658e?style=flat-square">
+  <img alt="Built with Electron" src="https://img.shields.io/badge/built%20with-Electron-51559e?style=flat-square">
+  <img alt="Free to use" src="https://img.shields.io/badge/cost-free-289b9e?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="#download">Download</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#faq">FAQ</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
+<!--
+  DEMO: record a 10-second GIF (ScreenToGif is free), save it as docs/demo.gif, then uncomment:
+  <p align="center"><img src="docs/demo.gif" alt="Neural Flow demo" width="720"></p>
+-->
+
+---
+
+## Why Neural Flow?
+
+Typing is slower than talking, but most dictation tools are either locked to one app, paid, or produce messy text full of "um" and "uh". Neural Flow works **in every app** (browsers, chat, editors, email), cleans up what you said with AI, and runs on a **free** speech-to-text key. There is no subscription and no account.
+
+> Speak naturally: *"um so tell the team the demo is moving to friday no wait thursday"*
+> Get: **"Tell the team the demo is moving to Thursday."**
+
+## Features
+
+| | |
+|---|---|
+| 🎙️ **Works in any app** | Hold the hotkey, speak, release. The text is typed where your cursor is. |
+| ✨ **AI cleanup** | Removes filler words and false starts, fixes punctuation, keeps your meaning and language (including Hinglish). |
+| 🖐️ **Hands-free mode** | Double-tap the hotkey to keep recording, tap once to finish. `Esc` cancels. |
+| 🎯 **Per-app tone** | Casual in Slack/Discord/WhatsApp, formal in email, terse in code editors. Rules are editable. |
+| 📖 **Personal dictionary** | Teach it names and terms (`neural syntax => NeuralSyntax`). |
+| ⚡ **Snippets** | Say "my email" and the full text is typed. |
+| 🗣️ **Voice commands** | "comma", "question mark", "new line", "new paragraph", "delete that", "press enter", "select all". |
+| 🕘 **History** | Your last dictations, stored only on your computer, with a Copy button if a paste ever fails. |
+| 🔒 **Private by design** | API keys are stored encrypted by your operating system. No analytics, no accounts. |
+| 📴 **Offline mode** | Run Whisper locally with whisper.cpp: no internet, no limits. |
+| 🔌 **Bring your provider** | Groq (free tier), OpenAI, NVIDIA Riva, or local. |
+
+## Download
+
+1. Go to the **[Releases page](https://github.com/YOUR-USERNAME/neural-flow/releases/latest)**.
+2. Download **`Neural-Flow-Setup-<version>.exe`** and run it.
+
+> **Windows shows "Windows protected your PC"?** The installer is not code-signed yet (certificates cost money), so SmartScreen warns about every new app. Click **More info → Run anyway**. The full source code is in this repository, and every release lists a SHA-256 checksum you can verify.
+
+**Requirements:** Windows 10 or 11, a microphone, and an internet connection (unless you use offline mode). macOS support is experimental and untested.
+
+## Quick start
+
+1. **Get a free API key.** Create a Groq account at [console.groq.com/keys](https://console.groq.com/keys). No credit card is needed.
+2. **Launch Neural Flow.** The Settings window opens on first run.
+3. **Paste your key** into *General → Groq API key*, click **Test**, then **Save**.
+4. **Dictate.** Click into any text box, hold **Right Ctrl**, speak, and let go.
+
+The app lives in the system tray (near the clock). Right-click the icon for Settings, History, or Quit.
+
+### Controls
+
+| Action | How |
+|---|---|
+| Dictate (hold to talk) | Hold the hotkey (default **Right Ctrl**; changeable in Settings) |
+| Hands-free | Double-tap the hotkey, tap once more to stop |
+| Cancel | `Esc` while recording |
+| Open Settings / History | Tray icon → right-click |
+
+### Voice commands
+
+| Say | Result |
+|---|---|
+| "comma", "full stop", "question mark", "exclamation mark" | Inserts the punctuation mark |
+| "new line", "new paragraph" | Inserts line breaks |
+| "delete that" / "scratch that" (alone) | Undoes the last dictation |
+| "press enter" (alone) | Presses Enter |
+| "select all" (alone) | Selects all text |
+
+### Dictionary and snippets
+
+Both live in *Settings → Dictionary & snippets*, one entry per line:
+
+```text
+# Dictionary: plain words teach spelling; "heard => Right" force-fixes mistakes
+NeuralSyntax
+neural syntax => NeuralSyntax
+
+# Snippets: say the trigger on its own to type the full text (\n = new line)
+my email => you@example.com
+yt intro => Hey guys, welcome back to the channel!\nToday we're building…
+```
+
+## How it works
+
+```
+ hold hotkey ──► record mic ──► speech-to-text ──► dictionary & voice commands
+                                                            │
+        text appears in your app ◄── paste ◄── AI cleanup (tone chosen from the active app)
+```
+
+Everything runs on your machine except the calls to the provider you choose.
+
+## Privacy
+
+- **Your audio is sent to the speech provider you configure** (Groq by default) to be transcribed. If AI cleanup is on, the transcript text is sent to the same provider.
+- Free API tiers generally come with no privacy guarantees. For sensitive material, use **Offline mode** and turn AI cleanup off, and nothing leaves your computer.
+- Settings and history are stored locally. API keys are encrypted with your operating system's secure storage when available.
+- Neural Flow has no telemetry and no server of its own.
+
+## Offline mode
+
+Settings → **Offline mode** walks you through it: download a [whisper.cpp release](https://github.com/ggml-org/whisper.cpp/releases) and a `ggml-*.bin` model, select both files, and choose *Offline (whisper.cpp)* as the provider.
+
+## Build from source
+
+Requires Node.js 22+.
+
+```bash
+git clone https://github.com/YOUR-USERNAME/neural-flow.git
+cd neural-flow
+npm install
+npm start
+```
+
+| Command | What it does |
+|---|---|
+| `npm test` | Runs the unit tests (hotkey logic, text processing, pipeline, settings store) |
+| `npm run dist:win` | Builds the Windows installer into `dist/` (run on Windows) |
+
+If Windows reports *"Cannot create symbolic link"* during the build, enable **Settings → For developers → Developer Mode**, delete `%LOCALAPPDATA%\electron-builder\Cache`, and run the command again. Pushing a tag such as `v0.2.0` makes GitHub Actions build the installer and attach it to a Release.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| Text doesn't paste into an app | If that app runs as Administrator, run Neural Flow as Administrator too. Otherwise open **History** and click **Copy**. |
+| The pill shows but nothing is typed | Check Windows → Privacy & security → Microphone and your default input device. |
+| "Rate limit" message | Wait a few seconds, or switch provider / use Offline mode. |
+| "Invalid API key" | Re-paste the key in Settings and click **Test**. |
+| Antivirus flags the app | Neural Flow listens for a global hotkey, which some antivirus tools flag. The source is open for review. |
+
+## Roadmap
+
+- [ ] Code-signed installer
+- [ ] macOS build and testing
+- [ ] Custom hotkey recorder
+- [ ] Auto-update
+- [ ] More languages and regional tone presets
+
+Ideas and votes welcome in [Issues](https://github.com/khushluck/neural-flow/issues).
+
+## FAQ
+
+**Is it really free?** The app is free and open source. Speech-to-text uses your own free Groq key, which has rate limits, so check your Groq console for the current numbers.
+
+**Why does it need keyboard access?** Only to detect your dictation hotkey and to send the paste shortcut. It doesn't record or store what you type.
+
+**Does it work with Hindi / Hinglish?** Yes. Leave the language on Auto-detect and tick *Hinglish in Roman letters* under AI cleanup.
+
+**Can I use it without internet?** Yes, with Offline mode (whisper.cpp).
+
+## Contributing
+
+Contributions are welcome. Fork the repo, create a branch, run `npm test`, and open a pull request. For bugs, please open an issue with your Windows version, the app version, and the terminal log if you ran it from source (never include API keys).
+
+## Disclaimer
+
+Neural Flow is an independent project. It is not affiliated with, endorsed by, or sponsored by Wispr Flow, Groq, OpenAI, or NVIDIA. All product names are trademarks of their respective owners.
+
+## License
+
+[MIT](LICENSE) © NeuralSyntax
+
+---
+
+<p align="center">
+  Built by <b>NeuralSyntax</b> · If this helped you, give it a ⭐
+</p>

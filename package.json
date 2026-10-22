@@ -1,0 +1,80 @@
+{
+  "name": "neural-flow",
+  "productName": "Neural Flow",
+  "version": "0.2.0",
+  "description": "Free, open-source voice dictation for any app: hold a key, speak, and clean text appears where you are typing.",
+  "main": "main.js",
+  "author": "NeuralSyntax",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.0",
+    "@grpc/proto-loader": "^0.7.13",
+    "dotenv": "^16.4.5",
+    "uiohook-napi": "^1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "uiohook-napi@1.5.5": true,
+    "protobufjs@7.6.6": true
+  },
+  "build": {
+    "appId": "com.neuralsyntax.neuralflow",
+    "productName": "Neural Flow",
+    "npmRebuild": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "settingsPreload.js",
+      "overlay.html",
+      "settings.html",
+      "nvidia-asr.js",
+      "lib/**",
+      "proto/**",
+      "assets/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "Neural-Flow-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
+      "hardenedRuntime": false,
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Neural Flow needs the microphone to hear your dictation."
+      }
+    }
+  }
+}
