@@ -1,0 +1,110 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  :root { --bg:#131421; --border:#4E5C72; --text:#D9DEE8; --g:linear-gradient(90deg,#289B9E,#2F658E,#51559E,#5A3697); }
+  html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:500 12px Inter,system-ui,sans-serif;color:var(--text)}
+  body{display:flex;align-items:center;justify-content:center}
+  #pill{display:flex;align-items:center;justify-content:center;gap:10px;height:34px;min-width:56px;max-width:360px;padding:0 16px;
+    border-radius:17px;background:var(--bg);border:1px solid var(--border);transition:all .18s ease;opacity:.75}
+  #pill.listening{min-width:180px;opacity:1;border-color:transparent;
+    background:linear-gradient(var(--bg),var(--bg)) padding-box,var(--g) border-box;box-shadow:0 0 18px rgba(40,155,158,.25)}
+  #pill.processing{min-width:120px;opacity:1}
+  #pill.toast{min-width:150px;opacity:1;border-color:#289B9E}
+  #pill.error{min-width:200px;opacity:1;border-color:#c0505a}
+  canvas{display:none;width:120px;height:22px}
+  #pill.listening canvas{display:block}
+  #label{display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #pill.processing #label,#pill.error #label,#pill.toast #label,#pill.listening.hasmsg #label{display:block}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--g);flex:none}
+</style>
+<div id="pill"><span class="dot"></span><canvas id="wave" width="240" height="44"></canvas><span id="label"></span></div>
+<script>
+const pill = document.getElementById('pill'), label = document.getElementById('label');
+const cv = document.getElementById('wave'), g = cv.getContext('2d');
+let session = null, raf = 0, resetTimer = 0;
+
+function setState(s, msg) {
+  clearTimeout(resetTimer);
+  pill.className = (s === 'idle' ? '' : s) + (s === 'listening' && msg ? ' hasmsg' : '');
+  label.textContent = s === 'processing' ? 'Thinking…' : (msg || '');
+  if (s === 'error') resetTimer = setTimeout(() => setState('idle'), 3500);
+  if (s === 'toast') resetTimer = setTimeout(() => setState('idle'), 2200);
+}
+
+function draw() {
+  const a = session && session.analyser;
+  if (!a) return;
+  const data = new Uint8Array(a.fftSize);
+  a.getByteTimeDomainData(data);
+  let sum = 0; for (const v of data) sum += (v - 128) ** 2;
+  const level = Math.min(1, Math.sqrt(sum / data.length) / 12); // sensitive enough for normal speech
+  g.clearRect(0, 0, cv.width, cv.height);
+  const grad = g.createLinearGradient(0, 0, cv.width, 0);
+  ['#289B9E', '#2F658E', '#51559E', '#5A3697'].forEach((c, i) => grad.addColorStop(i / 3, c));
+  g.fillStyle = grad;
+  const n = 21, w = 6, gap = 5;
+  for (let i = 0; i < n; i++) {
+    const shape = 0.35 + 0.65 * Math.abs(Math.sin(i * 0.6 + performance.now() / 180));
+    const h = Math.max(4, level * shape * cv.height);
+    g.beginPath(); g.roundRect(i * (w + gap), (cv.height - h) / 2, w, h, 3); g.fill();
+  }
+  raf = requestAnimationFrame(draw);
+}
+
+const WORKLET = `class P extends AudioWorkletProcessor{process(i){const c=i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor('pcm',P)`;
+
+// Each recording is its own "session", so quick tap / tap / hold sequences can never trample each other's mic or audio graph.
+function startRec() {
+  const s = { chunks: [], closed: false, stream: null, actx: null, node: null, analyser: null };
+  session = s;
+  s.ready = (async () => {
+    try {
+      s.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      if (s.closed) { s.stream.getTracks().forEach((t) => t.stop()); return false; }
+      s.actx = new AudioContext({ sampleRate: 16000 });
+      await s.actx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' })));
+      await s.actx.resume(); // contexts started from a hotkey (not a click) can begin 'suspended'
+      if (s.closed) { teardown(s); return false; }
+      const src = s.actx.createMediaStreamSource(s.stream);
+      s.analyser = s.actx.createAnalyser(); s.analyser.fftSize = 512;
+      s.node = new AudioWorkletNode(s.actx, 'pcm');
+      s.node.port.onmessage = (e) => s.chunks.push(e.data);
+      src.connect(s.analyser); src.connect(s.node);
+      const mute = s.actx.createGain(); mute.gain.value = 0; s.node.connect(mute); mute.connect(s.actx.destination); // keeps Chromium pulling audio
+      if (session === s) { setState('listening'); cancelAnimationFrame(raf); draw(); }
+      return true;
+    } catch (e) {
+      teardown(s);
+      if (session === s) { session = null; setState('error', 'Microphone blocked'); window.nf.recFailed(); }
+      return false;
+    }
+  })();
+}
+
+function teardown(s) {
+  s.closed = true;
+  try { s.stream && s.stream.getTracks().forEach((t) => t.stop()); } catch {}   // mic indicator off immediately
+  try { s.node && s.node.disconnect(); } catch {}
+  try { s.actx && s.actx.state !== 'closed' && s.actx.close(); } catch {}
+}
+
+async function stopRec({ tooShort, cancel } = {}) {
+  const s = session; if (!s) return;
+  session = null;
+  cancelAnimationFrame(raf);
+  const ok = await s.ready;
+  teardown(s);
+  if (!ok) return;
+  if (tooShort || cancel) return setState('idle');
+  const total = s.chunks.reduce((n, c) => n + c.length, 0);
+  const pcm = new Int16Array(total); let o = 0;
+  for (const c of s.chunks) for (let i = 0; i < c.length; i++) pcm[o++] = Math.max(-1, Math.min(1, c[i])) * 0x7fff;
+  setState('processing');
+  window.nf.sendAudio(pcm.buffer);
+}
+
+// While a recording is in progress, ignore late 'idle/processing/toast' updates from the previous utterance.
+window.nf.on('state', (st, msg) => { if (session && st !== 'listening' && st !== 'error') return; setState(st, msg); });
+window.nf.on('rec:start', startRec);
+window.nf.on('rec:stop', stopRec);
+</script>
