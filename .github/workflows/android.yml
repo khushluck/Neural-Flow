@@ -18,6 +18,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Locate Android project
+        id: locate
+        run: |
+          set -euo pipefail
+          f=$(find . -maxdepth 4 -iname 'settings.gradle*' -not -path './.git/*' | awk '{print gsub("/","/"), $0}' | sort -n | head -1 | cut -d' ' -f2- || true)
+          if [ -z "$f" ]; then
+            echo "::error::No Android project (settings.gradle / settings.gradle.kts) found in this repository. Commit and push your Android folder, then re-run. Files in the repo:"
+            git ls-files | head -80
+            exit 1
+          fi
+          dir=$(dirname "$f")
+          echo "Android project found in: $dir"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
 
@@ -28,7 +42,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-          build-root-directory: android
+          build-root-directory: ${{ steps.locate.outputs.dir }}
 
       - name: Decode signing keystore (only if the secret is set)
         if: env.KS_B64 != ''
@@ -37,7 +51,7 @@ jobs:
           echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Build both editions
-        working-directory: android
+        working-directory: ${{ steps.locate.outputs.dir }}
         run: |
           if [ -f ./gradlew ]; then
             chmod +x ./gradlew
@@ -47,6 +61,8 @@ jobs:
           fi
 
       - name: Collect and sign APKs
+        env:
+          ANDROID_DIR: ${{ steps.locate.outputs.dir }}
         run: |
           set -euo pipefail
           mkdir -p out
@@ -72,10 +88,10 @@ jobs:
           fi
 
           pack() {  # $1 = flavor, $2 = output file name
-            src=$(find "android/app/build/outputs/apk/$1/release" -name '*.apk' 2>/dev/null | head -1 || true)
+            src=$(find "$ANDROID_DIR" -path "*/build/outputs/apk/$1/release/*.apk" 2>/dev/null | head -1 || true)
             if [ -z "$src" ]; then
               echo "::error::No $1 release APK found. APKs that were built:"
-              find android -name '*.apk' || true
+              find "$ANDROID_DIR" -name '*.apk' || true
               exit 1
             fi
             echo "Found $1 APK: $src"
