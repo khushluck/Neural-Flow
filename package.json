@@ -1,7 +1,7 @@
 {
   "name": "neural-flow",
   "productName": "Neural Flow",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Free, open-source voice dictation for any app: hold a key, speak, and clean text appears where you are typing.",
   "main": "main.js",
   "author": "NeuralSyntax",
@@ -67,14 +67,24 @@
       "allowToChangeInstallationDirectory": true
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
       "category": "public.app-category.productivity",
       "icon": "assets/icon.png",
       "hardenedRuntime": false,
       "identity": null,
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Neural Flow needs the microphone to hear your dictation."
-      }
-    }
+      },
+      "artifactName": "Neural-Flow-${version}-mac-${arch}.${ext}"
+    },
+    "afterPack": "build/afterPack.js"
   }
 }
