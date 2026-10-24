@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_desc">Lets Neural Flow type your dictated text into the text box you are using. It does not read or store anything on your screen.</string>
+</resources>
