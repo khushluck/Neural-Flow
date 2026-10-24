@@ -22,6 +22,8 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
 
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'   # default 'tools platform-tools' fails: legacy 'tools' package no longer exists
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -51,7 +53,7 @@ jobs:
 
           # Newest installed build-tools (zipalign + apksigner)
           if ! ls "$ANDROID_HOME"/build-tools/* >/dev/null 2>&1; then
-            yes | sdkmanager "build-tools;34.0.0" >/dev/null
+            sdkmanager "build-tools;34.0.0" >/dev/null
           fi
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
 
