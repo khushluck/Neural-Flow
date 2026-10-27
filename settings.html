@@ -1,168 +1,795 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta name="color-scheme" content="dark">
 <title>Neural Flow</title>
 <style>
-  :root{--bg:#0f1117;--card:#171a23;--line:#262b38;--text:#dde2ee;--mut:#8a93a6;--acc:#289b9e;--acc2:#5a3697;--bad:#c0505a}
-  *{box-sizing:border-box} html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,Segoe UI,sans-serif}
-  body{display:flex}
-  nav{width:190px;padding:18px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
-  nav h1{font-size:16px;margin:0 8px 14px;background:linear-gradient(90deg,#289B9E,#8f6bd6);-webkit-background-clip:text;color:transparent}
-  nav button{all:unset;cursor:pointer;padding:8px 10px;border-radius:8px;color:var(--mut)}
-  nav button:hover{background:var(--card)} nav button.on{background:var(--card);color:var(--text);box-shadow:inset 3px 0 var(--acc)}
-  main{flex:1;display:flex;flex-direction:column;min-width:0}
-  #panes{flex:1;overflow:auto;padding:22px 28px}
-  .pane{display:none;max-width:640px} .pane.on{display:block}
-  h2{margin:0 0 14px;font-size:18px} h3{margin:22px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
-  label{display:block;margin:12px 0 4px;font-weight:600} .hint{color:var(--mut);font-size:12px;margin:3px 0 0}
-  input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
-  textarea{min-height:130px;font:13px/1.5 ui-monospace,Consolas,monospace;resize:vertical}
-  input:focus,select:focus,textarea:focus{outline:1px solid var(--acc)}
-  .row{display:flex;gap:8px;align-items:center} .row>*:first-child{flex:1}
-  .chk{display:flex;gap:10px;align-items:flex-start;margin:12px 0} .chk input{margin-top:4px} .chk b{display:block}
-  button.btn{cursor:pointer;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font:inherit}
-  button.btn:hover{border-color:var(--acc)} button.pri{background:linear-gradient(90deg,#289B9E,#5A3697);border:0;color:#fff;font-weight:600}
-  footer{padding:12px 28px;border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;justify-content:flex-end}
-  #msg{color:var(--mut);flex:1} .ok{color:#5fd1a0}.err{color:var(--bad)}
-  .hist{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
-  .hist small{color:var(--mut)} .hist p{margin:6px 0;white-space:pre-wrap} .hist .row{gap:6px;justify-content:flex-end}
-  a{color:var(--acc);cursor:pointer} code{background:var(--card);padding:1px 5px;border-radius:5px}
-  [data-for]{display:none}
+  :root {
+    --bg: #131421; --panel: rgba(255,255,255,.035); --panel2: rgba(255,255,255,.065); --line: rgba(255,255,255,.08); --line2: rgba(78,92,114,.6);
+    --text: #fff; --body: #D9DEE8; --mut: #A9B4C7; --dim: #7E889B;
+    --teal: #289B9E; --blue: #2F658E; --indigo: #51559E; --purple: #5A3697;
+    --grad: linear-gradient(90deg, #289B9E, #2F658E, #51559E, #5A3697); --grad2: linear-gradient(135deg, #289B9E, #2F658E 45%, #5A3697);
+    --ok: #4FD1A5; --warn: #F2B35E; --bad: #E5596A; --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; color: var(--body); overflow: hidden; -webkit-font-smoothing: antialiased; user-select: none;
+    font: 14px/1.5 Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: radial-gradient(900px 520px at 6% -12%, rgba(40,155,158,.17), transparent 62%), radial-gradient(820px 640px at 104% 112%, rgba(90,54,151,.22), transparent 62%), var(--bg); }
+  textarea, input { user-select: text; }
+  svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: #5FD0D2; cursor: pointer; text-decoration: none; } a:hover { text-decoration: underline; }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 6px; font: 12px ui-monospace, Consolas, monospace; color: #cfd6e6; }
+  ::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; } ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.22); background-clip: content-box; border: 3px solid transparent; }
+
+  #app { display: grid; grid-template-columns: 252px 1fr; height: 100vh; }
+
+  /* ---------- sidebar ---------- */
+  aside { display: flex; flex-direction: column; padding: 18px 14px 16px; border-right: 1px solid var(--line); background: rgba(9,10,18,.45); -webkit-app-region: drag; }
+  body.mac aside { padding-top: 40px; }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 18px; }
+  .logo { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--grad2); color: #fff; box-shadow: 0 6px 20px rgba(40,155,158,.28), inset 0 1px 0 rgba(255,255,255,.25); }
+  .logo svg { width: 20px; height: 20px; stroke-width: 2; }
+  .brand b { display: block; font-size: 15.5px; color: #fff; letter-spacing: .01em; line-height: 1.2; }
+  .brand small { color: var(--dim); font-size: 11.5px; }
+  nav { display: flex; flex-direction: column; gap: 3px; -webkit-app-region: no-drag; }
+  nav .grp { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); padding: 14px 10px 5px; }
+  nav button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 11px; color: var(--mut); cursor: pointer; position: relative; transition: background .18s, color .18s, transform .18s var(--ease); }
+  nav button:hover { background: var(--panel); color: #fff; transform: translateX(2px); }
+  nav button.on { background: var(--panel2); color: #fff; }
+  nav button.on::before { content: ''; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 4px; border-radius: 0 4px 4px 0; background: var(--grad2); }
+  nav button.on svg { color: #5FD0D2; }
+  .grow { flex: 1; }
+  #status { -webkit-app-region: no-drag; display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; padding: 11px 12px; border-radius: 13px; background: var(--panel); border: 1px solid var(--line); color: var(--body); }
+  #status:hover { border-color: var(--line2); }
+  #status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 4px rgba(242,179,94,.15); flex: none; }
+  #status.ok .dot { background: var(--ok); box-shadow: 0 0 0 4px rgba(79,209,165,.15); animation: pulse 2.6s ease-in-out infinite; }
+  #status b { display: block; font-size: 12.5px; color: #fff; line-height: 1.25; } #status small { color: var(--mut); font-size: 11.5px; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(79,209,165,.05); } }
+
+  /* ---------- main ---------- */
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .top { height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 150px 0 36px; -webkit-app-region: drag; }
+  body:not(.win) .top { padding-right: 36px; }
+  .search { position: relative; display: block; width: min(340px, 100%); -webkit-app-region: no-drag; }
+  .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--dim); width: 16px; height: 16px; pointer-events: none; }
+  label.search input[type=text] { width: 100%; height: 32px; padding: 0 12px 0 38px; border-radius: 16px; border: 1px solid var(--line); background: rgba(0,0,0,.22); color: #fff; font: inherit; font-size: 13px; outline: none; transition: border-color .2s, box-shadow .2s; }
+  label.search input[type=text]:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(40,155,158,.18); }
+  #saved { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 7px; transition: color .3s; -webkit-app-region: no-drag; white-space: nowrap; }
+  #saved i { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); } #saved.ok { color: var(--ok); } #saved.ok i { background: var(--ok); } #saved.busy i { background: var(--warn); }
+  #panes { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 36px 44px; }
+  .pane { display: none; max-width: 780px; } .pane.on { display: block; animation: rise .34s var(--ease) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  .pane > .card, .pane > .tiles, .pane > .hero { animation: rise .45s var(--ease) both; } .pane > :nth-child(2) { animation-delay: .04s; } .pane > :nth-child(3) { animation-delay: .08s; } .pane > :nth-child(4) { animation-delay: .12s; } .pane > :nth-child(5) { animation-delay: .16s; }
+  .phead { padding: 8px 0 20px; } .phead h1 { margin: 0; font-size: 27px; font-weight: 700; color: #fff; letter-spacing: -.01em; } .phead p { margin: 5px 0 0; color: var(--mut); font-size: 14px; max-width: 560px; }
+  body.searching .phead { display: none; } body.searching .pane { display: block; animation: none; max-width: 780px; } body.searching .pane > * { animation: none; }
+  .hidden { display: none !important; }
+
+  /* ---------- cards & rows ---------- */
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 22px; margin: 0 0 18px; box-shadow: 0 1px 0 rgba(255,255,255,.03) inset; }
+  .card > h3 { margin: 0; padding: 16px 0 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mut); display: flex; align-items: center; gap: 8px; }
+  body.searching .card > h3[data-ctx]::before { content: attr(data-ctx) '  ›'; color: #5FD0D2; letter-spacing: .04em; margin-right: 2px; }
+  .card > h3 .n { margin-left: auto; font-size: 11px; color: var(--dim); letter-spacing: 0; text-transform: none; font-weight: 500; }
+  .set { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 16px 0; border-top: 1px solid var(--line); }
+  .card > h3 + .set, .card > .set:first-child { border-top: 0; }
+  .set .txt { min-width: 0; } .set .txt b { display: block; font-weight: 600; color: #fff; font-size: 14px; }
+  .set .txt p { margin: 3px 0 0; color: var(--mut); font-size: 12.5px; line-height: 1.5; max-width: 470px; }
+  .set .ctl { display: flex; align-items: center; gap: 10px; flex: none; }
+  .set.block { flex-direction: column; align-items: stretch; gap: 12px; }
+  .set.block .ctl { width: 100%; }
+  .note { margin: 0; padding: 12px 14px; border-radius: 12px; background: rgba(40,155,158,.08); border: 1px solid rgba(40,155,158,.22); color: #BFE9EA; font-size: 12.5px; }
+  .note.warn { background: rgba(242,179,94,.08); border-color: rgba(242,179,94,.28); color: #F5D9AE; }
+  .card .note { margin: 4px 0 16px; }
+  .empty { color: var(--dim); font-size: 13px; margin: 6px 0 14px; }
+
+  /* ---------- controls ---------- */
+  .sw { position: relative; width: 46px; height: 27px; flex: none; display: inline-block; }
+  .sw input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .sw i { position: absolute; inset: 0; border-radius: 14px; background: rgba(255,255,255,.13); transition: background .25s; }
+  .sw i::after { content: ''; position: absolute; left: 3px; top: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); transition: transform .3s var(--ease); }
+  .sw input:checked + i { background: var(--grad2); } .sw input:checked + i::after { transform: translateX(19px); }
+  .sw input:focus-visible + i { outline: 2px solid #5FD0D2; outline-offset: 2px; }
+
+  select, input[type=text], input[type=password], input[type=number], textarea { font: inherit; font-size: 13.5px; color: #fff; background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 11px; padding: 10px 13px; outline: none; transition: border-color .2s, box-shadow .2s, background .2s; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; min-width: 190px; max-width: 320px;
+    background-image: linear-gradient(45deg, transparent 50%, #A9B4C7 50%), linear-gradient(135deg, #A9B4C7 50%, transparent 50%); background-position: calc(100% - 19px) 52%, calc(100% - 14px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
+  select option { background: #1b1d2e; color: #fff; }
+  input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(40,155,158,.18); }
+  input[type=number] { width: 96px; } input[type=text], input[type=password] { width: 100%; }
+  textarea { width: 100%; min-height: 110px; resize: vertical; font: 13px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace; }
+  ::placeholder { color: #66708a; }
+
+  .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 13px; background: rgba(0,0,0,.28); border: 1px solid var(--line); }
+  .seg button { all: unset; box-sizing: border-box; cursor: pointer; padding: 7px 14px; border-radius: 10px; color: var(--mut); font-size: 13px; font-weight: 600; transition: color .2s, background .25s; }
+  .seg button:hover { color: #fff; } .seg button.on { background: var(--grad2); color: #fff; box-shadow: 0 3px 12px rgba(47,101,142,.45); }
+
+  .btn { border: 1px solid var(--line2); background: var(--panel); color: #fff; padding: 9px 15px; border-radius: 11px; font-size: 13px; font-weight: 600; transition: border-color .2s, background .2s, transform .15s var(--ease); white-space: nowrap; }
+  .btn:hover { border-color: var(--teal); background: var(--panel2); } .btn:active { transform: scale(.97); } .btn:disabled { opacity: .55; cursor: default; }
+  .btn.sm { padding: 6px 11px; font-size: 12px; border-radius: 9px; }
+  .btn.pri { border: 0; background: var(--grad2); box-shadow: 0 6px 20px rgba(47,101,142,.4), inset 0 1px 0 rgba(255,255,255,.2); }
+  .btn.pri:hover { filter: brightness(1.12); } .btn.danger:hover { border-color: var(--bad); color: #FBD3D8; }
+
+  kbd { display: inline-block; min-width: 30px; padding: 5px 11px; border-radius: 9px; background: linear-gradient(#2c2f48, #1e2134); border: 1px solid #3b405f; border-bottom-width: 3px; color: #fff; font: 600 12.5px Inter, "Segoe UI", sans-serif; text-align: center; box-shadow: 0 2px 0 rgba(0,0,0,.25); white-space: nowrap; }
+  .keyrow { position: relative; width: 100%; } .keyrow input { padding-right: 44px; }
+  .eye { all: unset; cursor: pointer; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 6px; color: var(--dim); border-radius: 8px; } .eye:hover { color: #fff; background: var(--panel2); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(242,179,94,.12); color: var(--warn); }
+  .pill.ok { background: rgba(79,209,165,.12); color: var(--ok); } .pill.bad { background: rgba(229,89,106,.12); color: #F3A0AA; }
+  .res { font-size: 12.5px; color: var(--mut); } .res.ok { color: var(--ok); } .res.err { color: #F3A0AA; }
+
+  .pcards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; }
+  .pcard { all: unset; box-sizing: border-box; cursor: pointer; padding: 14px 15px; border-radius: 15px; border: 1px solid var(--line); background: rgba(0,0,0,.18); transition: border-color .2s, background .2s, transform .2s var(--ease); position: relative; }
+  .pcard:hover { border-color: var(--line2); transform: translateY(-1px); } .pcard b { display: block; color: #fff; font-size: 14px; } .pcard span { color: var(--mut); font-size: 12px; display: block; margin-top: 2px; }
+  .pcard em { position: absolute; top: 12px; right: 12px; font-style: normal; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(79,209,165,.14); color: var(--ok); }
+  .pcard.on { border-color: transparent; background: linear-gradient(rgba(25,27,44,.96), rgba(25,27,44,.96)) padding-box, var(--grad) border-box; box-shadow: 0 8px 26px rgba(47,101,142,.25); }
+
+  /* chips / lists */
+  .adder { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; } .adder input { flex: 1; min-width: 150px; width: auto; } .adder .arrow { align-self: center; color: var(--dim); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 6px 6px 13px; border-radius: 20px; background: var(--panel2); border: 1px solid var(--line); font-size: 13px; animation: pop .3s var(--ease); }
+  .chip em { font-style: normal; color: var(--dim); } .chip b { color: #fff; font-weight: 600; } .chip span { color: var(--mut); }
+  .chip button { all: unset; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: var(--dim); font-size: 15px; line-height: 1; } .chip button:hover { background: rgba(229,89,106,.2); color: #F3A0AA; }
+  @keyframes pop { from { transform: scale(.85); opacity: 0; } }
+  .rows { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .rrow { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 13px; background: rgba(0,0,0,.2); border: 1px solid var(--line); animation: pop .3s var(--ease); }
+  .rrow .k { flex: 1; min-width: 0; } .rrow .k b { color: #fff; font-weight: 600; display: block; } .rrow .k span { color: var(--mut); font-size: 12.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rrow select { min-width: 130px; padding-top: 7px; padding-bottom: 7px; } .tag { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 8px; background: rgba(81,85,158,.3); color: #B9BDF5; margin-left: 8px; vertical-align: 1px; }
+  details { width: 100%; } summary { cursor: pointer; color: var(--mut); font-size: 12.5px; padding: 4px 0; outline: none; } summary:hover { color: #fff; } details textarea { margin-top: 8px; }
+
+  /* ---------- home ---------- */
+  .hero { position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr 230px; gap: 10px; padding: 30px 32px; margin: 8px 0 18px; border-radius: 24px; border: 1px solid transparent;
+    background: linear-gradient(135deg, rgba(25,27,46,.97), rgba(26,22,48,.97)) padding-box, var(--grad) border-box; box-shadow: 0 14px 44px rgba(47,101,142,.18); }
+  .hero::after { content: ''; position: absolute; width: 360px; height: 360px; right: -120px; top: -150px; background: radial-gradient(circle, rgba(90,54,151,.35), transparent 65%); pointer-events: none; }
+  .eyebrow { margin: 0 0 8px; color: #5FD0D2; font-weight: 700; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+  .hero h1 { margin: 0; font-size: 34px; line-height: 1.12; color: #fff; letter-spacing: -.02em; } .g { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { margin: 14px 0 20px; color: var(--body); max-width: 440px; font-size: 14.5px; } .lead kbd { margin: 0 2px; }
+  .hero .acts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .art { display: flex; align-items: center; justify-content: center; gap: 5px; height: 100%; min-height: 120px; position: relative; z-index: 1; }
+  .art i { display: block; width: 6px; border-radius: 4px; background: linear-gradient(#289B9E, #5A3697); animation: eq 1.3s ease-in-out infinite; height: 24px; }
+  @keyframes eq { 0%,100% { height: 14px; opacity: .55; } 50% { height: var(--h, 70px); opacity: 1; } }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+  .tile { padding: 18px 20px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); } .tile .v { font-size: 30px; font-weight: 700; letter-spacing: -.02em; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.15; }
+  .tile .l { color: var(--mut); font-size: 12.5px; margin-top: 4px; }
+  .check { display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid var(--line); } .check:first-of-type { border-top: 0; }
+  .check .c { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line2); display: grid; place-items: center; flex: none; color: transparent; transition: all .3s var(--ease); }
+  .check .c svg { width: 14px; height: 14px; stroke-width: 3; } .check.done .c { background: var(--ok); border-color: var(--ok); color: #0c2a20; } .check b { color: #fff; font-weight: 600; display: block; } .check span { color: var(--mut); font-size: 12.5px; } .check .btn { margin-left: auto; }
+  .check.done b { color: var(--mut); text-decoration: line-through; text-decoration-color: rgba(255,255,255,.25); }
+  .sc { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--line); gap: 14px; } .card > h3 + .sc { border-top: 0; } .sc span { color: var(--body); } .sc .keys { display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12px; }
+  #practice { min-height: 96px; font: 15px/1.6 Inter, "Segoe UI", sans-serif; }
+
+  /* overlay preview */
+  .prev { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 22px; border-radius: 16px; background: linear-gradient(135deg, #46557d, #8a67ad 60%, #cf8499); margin: 6px 0 16px; width: 100%; }
+  .pp { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px 0 8px; border-radius: 22px; background: rgba(19,20,33,.97); border: 1px solid transparent; color: #fff; font-weight: 600; font-size: 12.5px; box-shadow: 0 10px 28px rgba(0,0,0,.4); }
+  .pp .ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--grad2); } .pp .ic svg { width: 15px; height: 15px; stroke-width: 2; }
+  .pp.l { background: linear-gradient(#131421, #131421) padding-box, var(--grad) border-box; } .pp .w { display: flex; align-items: center; gap: 2.5px; height: 24px; } .pp .w i { width: 2.6px; border-radius: 2px; background: linear-gradient(#289B9E, #5A3697); animation: eq 1.1s ease-in-out infinite; height: 8px; --h: 22px; } .pp small { color: var(--mut); font-weight: 500; }
+  .pp.ok .ic { background: var(--teal); } .pp.er { border-color: rgba(229,89,106,.6); } .pp.er .ic { background: var(--bad); }
+
+  /* ---------- history ---------- */
+  .hist { padding: 14px 16px; margin: 10px 0; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); transition: border-color .2s; animation: rise .35s var(--ease) both; } .hist:hover { border-color: var(--line2); }
+  .hist .m { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 12px; }
+  .av { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; text-transform: uppercase; flex: none; }
+  .hist .m b { color: var(--body); font-weight: 600; } .hist .m .badge { margin-left: auto; display: flex; gap: 6px; } .badge span { font-size: 10.5px; padding: 2px 8px; border-radius: 9px; background: var(--panel2); color: var(--mut); }
+  .hist p { margin: 10px 0 8px; white-space: pre-wrap; color: #fff; font-size: 14px; line-height: 1.6; user-select: text; } .hist .acts { display: flex; gap: 6px; justify-content: flex-end; opacity: .0; transition: opacity .2s; } .hist:hover .acts, .hist:focus-within .acts { opacity: 1; }
+  .hist textarea { margin: 10px 0 8px; min-height: 90px; font-family: Inter, "Segoe UI", sans-serif; font-size: 14px; }
+
+  /* ---------- toast + wizard ---------- */
+  #toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 24px); opacity: 0; pointer-events: none; padding: 11px 18px; border-radius: 14px; background: rgba(28,30,48,.96); border: 1px solid var(--line2); color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 14px 40px rgba(0,0,0,.5); transition: all .35s var(--ease); z-index: 60; display: flex; gap: 9px; align-items: center; }
+  #toast.show { transform: translate(-50%, 0); opacity: 1; } #toast.ok svg { color: var(--ok); } #toast.err svg { color: var(--bad); }
+  #wiz { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(8,9,16,.72); backdrop-filter: blur(10px); -webkit-app-region: no-drag; }
+  #wiz.on { display: flex; animation: fade .3s ease both; } @keyframes fade { from { opacity: 0; } }
+  .wcard { width: min(560px, calc(100vw - 48px)); padding: 34px 36px 28px; border-radius: 28px; border: 1px solid transparent; background: linear-gradient(#171929, #171929) padding-box, var(--grad) border-box; box-shadow: 0 30px 90px rgba(0,0,0,.6), 0 0 70px rgba(47,101,142,.18); animation: rise .5s var(--ease) both; }
+  .wstep { display: none; } .wstep.on { display: block; animation: rise .4s var(--ease) both; }
+  .wcard h2 { margin: 14px 0 8px; font-size: 26px; line-height: 1.15; color: #fff; letter-spacing: -.01em; } .wcard p { color: var(--body); margin: 0 0 14px; }
+  .wcard .logo { width: 52px; height: 52px; border-radius: 16px; } .wcard .logo svg { width: 26px; height: 26px; }
+  .wlist { list-style: none; padding: 0; margin: 16px 0 6px; display: grid; gap: 10px; } .wlist li { display: flex; gap: 12px; align-items: flex-start; color: var(--body); } .wlist li svg { color: #5FD0D2; margin-top: 2px; }
+  .wnav { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; } .dots { display: flex; gap: 7px; } .dots i { width: 7px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.18); transition: all .3s var(--ease); } .dots i.on { width: 22px; background: var(--grad); }
+  .wlink { background: none; border: 0; color: var(--dim); font-size: 12.5px; padding: 6px; } .wlink:hover { color: #fff; }
+
+  @media (max-width: 960px) { #app { grid-template-columns: 76px 1fr; } .brand div:not(.logo), nav .grp, nav button .lbl, #status div { display: none; } .brand { justify-content: center; padding-left: 0; padding-right: 0; } aside { padding-left: 10px; padding-right: 10px; } nav button { justify-content: center; } #status { justify-content: center; } .hero { grid-template-columns: 1fr; } .art { display: none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  [data-for] { display: none; }
 </style>
-<nav id="nav">
-  <h1>Neural Flow</h1>
-  <button data-tab="general">General</button><button data-tab="cleanup">AI cleanup</button><button data-tab="words">Dictionary &amp; snippets</button>
-  <button data-tab="history">History</button><button data-tab="offline">Offline mode</button><button data-tab="about">About</button>
-</nav>
-<main>
-<div id="panes">
 
-<section class="pane" id="general"><h2>General</h2>
-  <label>Speech-to-text provider</label>
-  <select data-k="provider"><option value="groq">Groq Whisper — free tier (recommended)</option><option value="openai">OpenAI</option><option value="nvidia">NVIDIA Riva</option><option value="local">Offline (whisper.cpp)</option></select>
+<div id="app">
+  <aside>
+    <div class="brand"><div class="logo" data-ic="mic"></div><div><b>Neural Flow</b><small id="ver">&nbsp;</small></div></div>
+    <nav id="nav">
+      <button data-tab="home"><span data-ic="home"></span><span class="lbl">Home</span></button>
+      <div class="grp">Voice</div>
+      <button data-tab="dictation"><span data-ic="keyboard"></span><span class="lbl">Dictation</span></button>
+      <button data-tab="speech"><span data-ic="cpu"></span><span class="lbl">Speech engine</span></button>
+      <button data-tab="cleanup"><span data-ic="spark"></span><span class="lbl">AI polish</span></button>
+      <button data-tab="words"><span data-ic="book"></span><span class="lbl">Words &amp; snippets</span></button>
+      <div class="grp">Experience</div>
+      <button data-tab="overlay"><span data-ic="layout"></span><span class="lbl">Overlay &amp; sounds</span></button>
+      <button data-tab="history"><span data-ic="clock"></span><span class="lbl">History</span></button>
+      <div class="grp">Account</div>
+      <button data-tab="privacy"><span data-ic="shield"></span><span class="lbl">Privacy &amp; data</span></button>
+      <button data-tab="about"><span data-ic="info"></span><span class="lbl">About</span></button>
+    </nav>
+    <div class="grow"></div>
+    <button id="status" type="button"><i class="dot"></i><div><b id="stT">Checking…</b><small id="stS">&nbsp;</small></div></button>
+  </aside>
 
-  <div data-for="groq"><label>Groq API key</label>
-    <div class="row"><input type="password" data-k="keys.groq" placeholder="gsk_…"><button class="btn" data-test="groq">Test</button></div>
-    <p class="hint">Free, no card: <a data-link="https://console.groq.com/keys">console.groq.com/keys</a>. Used for transcription and AI cleanup.</p></div>
-  <div data-for="openai"><label>OpenAI API key</label>
-    <div class="row"><input type="password" data-k="keys.openai" placeholder="sk-…"><button class="btn" data-test="openai">Test</button></div></div>
-  <div data-for="nvidia"><label>NVIDIA API key</label><input type="password" data-k="keys.nvidia" placeholder="nvapi-…">
-    <label>ASR function ID</label><input type="text" data-k="nvidia.functionId"><label>Language code</label><input type="text" data-k="nvidia.lang" placeholder="en-US"></div>
-  <div data-for="groq,openai"><label>Model override <span class="hint">(optional)</span></label><input type="text" data-k="sttModel" placeholder="whisper-large-v3-turbo"></div>
+  <main>
+    <div class="top">
+      <label class="search"><span data-ic="search"></span><input id="q" type="text" placeholder="Search settings…" autocomplete="off" spellcheck="false"></label>
+      <span id="saved"><i></i><span id="savedT">&nbsp;</span></span>
+    </div>
 
-  <label>Spoken language</label>
-  <select data-k="language"><option value="">Auto-detect (good for English / Hinglish)</option><option value="en">English</option><option value="hi">Hindi</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="pt">Portuguese</option><option value="ar">Arabic</option><option value="ja">Japanese</option></select>
-  <p class="hint">Hindi forced with <code>hi</code> usually comes out in Devanagari. Keep Auto and tick "Hinglish in Roman letters" under AI cleanup for Roman Hinglish.</p>
+    <div id="panes">
 
-  <h3>Hotkey</h3>
-  <select data-k="hotkey"><option value="CtrlRight">Right Ctrl</option><option value="AltRight">Right Alt / Right Option</option><option value="ShiftRight">Right Shift</option><option value="F8">F8</option><option value="F9">F9</option><option value="F10">F10</option></select>
-  <p class="hint">Hold to talk. Esc cancels a recording. Right Ctrl is the safest on Windows (a lone Alt tap can focus an app's menu bar).</p>
-  <div class="chk"><input type="checkbox" data-k="doubleTapLock" id="c1"><label for="c1" style="margin:0"><b>Hands-free mode</b>Double-tap the hotkey to keep recording without holding it; tap once more to finish.</label></div>
+      <!-- ================= HOME ================= -->
+      <section class="pane" id="home" data-title="Home">
+        <div class="hero">
+          <div>
+            <p class="eyebrow" id="greet">Welcome</p>
+            <h1>Speak. It types.<br><span class="g">In any app.</span></h1>
+            <p class="lead">Hold <kbd class="hk">Right Ctrl</kbd>, talk naturally, then let go. Neural Flow cleans it up and types it right where your cursor is.</p>
+            <div class="acts"><button class="btn pri" id="heroCta" type="button">Try it below</button><button class="btn" data-go="cleanup" type="button">Tune AI polish</button></div>
+          </div>
+          <div class="art" aria-hidden="true"></div>
+        </div>
 
-  <h3>Behaviour</h3>
-  <div class="chk"><input type="checkbox" data-k="voiceCommands" id="c2"><label for="c2" style="margin:0"><b>Voice commands</b>Say “comma”, “question mark”, “new line”, “new paragraph”; or alone: “delete that”, “press enter”, “select all”.</label></div>
-  <div class="chk"><input type="checkbox" data-k="keepInClipboard" id="c3"><label for="c3" style="margin:0"><b>Keep dictated text on the clipboard</b>Off = your previous clipboard is restored after pasting. Turn on if you often dictate with no text box focused.</label></div>
-  <div class="chk"><input type="checkbox" data-k="launchAtLogin" id="c4"><label for="c4" style="margin:0"><b>Start with the computer</b>Only applies to the installed app.</label></div>
-</section>
+        <div class="card" id="setup">
+          <h3>Getting started <span class="n" id="setupN"></span></h3>
+          <div class="check" id="ck1"><div class="c" data-ic="check"></div><div><b>Connect a speech engine</b><span>A free Groq key takes about a minute.</span></div><button class="btn sm pri" data-go="speech" type="button">Connect</button></div>
+          <div class="check" id="ck2"><div class="c" data-ic="check"></div><div><b>Turn on AI polish</b><span>Removes “um”, fixes punctuation, formats lists.</span></div><button class="btn sm" id="ck2b" type="button">Turn on</button></div>
+          <div class="check" id="ck3"><div class="c" data-ic="check"></div><div><b>Dictate your first sentence</b><span>Use the box further down this page.</span></div></div>
+        </div>
 
-<section class="pane" id="cleanup"><h2>AI cleanup</h2>
-  <div class="chk"><input type="checkbox" data-k="cleanup.enabled" id="d1"><label for="d1" style="margin:0"><b>Clean up my speech</b>Removes “um/uh/matlab”, fixes punctuation, keeps your meaning. Uses your Groq (or OpenAI) key, adds ~0.5 s.</label></div>
-  <label>Default tone</label>
-  <select data-k="tone"><option value="neutral">Neutral</option><option value="casual">Casual (chat)</option><option value="formal">Formal (email)</option><option value="code">Code / technical</option></select>
-  <div class="chk"><input type="checkbox" data-k="cleanup.hinglishRoman" id="d2"><label for="d2" style="margin:0"><b>Hinglish in Roman letters</b>Never output Devanagari; Hindi words stay as “kaise ho”.</label></div>
-  <label>Skip cleanup for short phrases (fewer than N words)</label><input type="number" min="1" max="30" data-k="cleanup.minWords">
-  <label>Cleanup model</label><input type="text" data-k="cleanup.model" placeholder="llama-3.1-8b-instant">
-  <h3>Per-app tone</h3>
-  <textarea data-k="appRules" spellcheck="false"></textarea>
-  <p class="hint">One rule per line: <code>app=tone</code> (matches the program name, e.g. <code>slack=casual</code>) or <code>title:gmail=formal</code> (matches the window title). Tones: neutral, casual, formal, code.</p>
-</section>
+        <div class="tiles">
+          <div class="tile"><div class="v" id="sWords">0</div><div class="l">words dictated</div></div>
+          <div class="tile"><div class="v" id="sSaved">0 min</div><div class="l">saved vs typing</div></div>
+          <div class="tile"><div class="v" id="sCount">0</div><div class="l">dictations</div></div>
+        </div>
 
-<section class="pane" id="words"><h2>Dictionary &amp; snippets</h2>
-  <h3>Personal dictionary</h3>
-  <textarea data-k="dictionary" spellcheck="false" placeholder="NeuralSyntax&#10;Claude Code&#10;neural syntax => NeuralSyntax"></textarea>
-  <p class="hint">One entry per line. A plain word teaches the recogniser the spelling. <code>heard =&gt; Right</code> force-fixes a recurring mistake.</p>
-  <h3>Snippets</h3>
-  <textarea data-k="snippets" spellcheck="false" placeholder="my email => you@example.com&#10;yt intro => Hey guys, welcome back to NeuralSyntax!\nToday we’re…"></textarea>
-  <p class="hint">Say the trigger on its own (optionally “insert …”) and the full text is typed. <code>\n</code> = new line.</p>
-</section>
+        <div class="card">
+          <h3>Try it right here</h3>
+          <div class="set block"><div class="txt"><p>Click into the box, hold <kbd class="hk">Right Ctrl</kbd> and speak. Try “shopping list milk eggs bread”.</p></div>
+            <textarea id="practice" placeholder="Your words will appear here…" spellcheck="false"></textarea></div>
+        </div>
 
-<section class="pane" id="history"><h2>History</h2>
-  <div class="row" style="margin-bottom:8px"><span class="hint">Your last dictations, saved only on this computer. Click Copy if anything failed to paste.</span><button class="btn" id="clr">Clear all</button></div>
-  <div id="histList"></div>
-</section>
+        <div class="card">
+          <h3>Shortcuts</h3>
+          <div class="sc"><span>Dictate (hold)</span><span class="keys"><kbd class="hk">Right Ctrl</kbd></span></div>
+          <div class="sc"><span>Hands-free (keep talking)</span><span class="keys"><kbd class="hk">Right Ctrl</kbd> twice, then once to finish</span></div>
+          <div class="sc"><span>Edit selected text by voice</span><span class="keys">Select text, hold <kbd class="ck">F9</kbd></span></div>
+          <div class="sc"><span>Cancel a recording</span><span class="keys"><kbd>Esc</kbd></span></div>
+        </div>
+      </section>
 
-<section class="pane" id="offline"><h2>Offline mode (whisper.cpp)</h2>
-  <p class="hint">Runs Whisper on your own computer: no internet, no limits, nothing leaves your PC. Choose “Offline (whisper.cpp)” as the provider on the General tab after setting these up.</p>
-  <ol class="hint"><li>Download a <b>whisper.cpp release</b> for your OS from <a data-link="https://github.com/ggml-org/whisper.cpp/releases">github.com/ggml-org/whisper.cpp/releases</a> and unzip it.</li>
-  <li>Download a model such as <b>ggml-base.bin</b> (or <b>ggml-small.bin</b> for better accuracy) from <a data-link="https://huggingface.co/ggerganov/whisper.cpp/tree/main">huggingface.co/ggerganov/whisper.cpp</a>.</li><li>Point to both files below.</li></ol>
-  <label>whisper.cpp program (<code>whisper-cli.exe</code>)</label><div class="row"><input type="text" data-k="local.binary"><button class="btn" data-pick="local.binary">Browse…</button></div>
-  <label>Model file (<code>ggml-….bin</code>)</label><div class="row"><input type="text" data-k="local.model"><button class="btn" data-pick="local.model">Browse…</button></div>
-  <label>CPU threads</label><input type="number" min="1" max="32" data-k="local.threads">
-  <p class="hint">Offline AI cleanup still needs a Groq/OpenAI key; turn cleanup off for a fully offline setup.</p>
-</section>
+      <!-- ================= DICTATION ================= -->
+      <section class="pane" id="dictation" data-title="Dictation">
+        <div class="phead"><h1>Dictation</h1><p>How you start, stop and shape a recording.</p></div>
+        <div class="card"><h3>Hotkeys</h3>
+          <div class="set"><div class="txt"><b>Dictation key</b><p>Hold to talk, release to type. Right Ctrl is the safest on Windows.</p></div>
+            <div class="ctl"><kbd class="hk">Right Ctrl</kbd>
+              <select data-k="hotkey"><option value="CtrlRight">Right Ctrl</option><option value="AltRight">Right Alt / Right Option</option><option value="ShiftRight">Right Shift</option><option value="F8">F8</option><option value="F9">F9</option><option value="F10">F10</option></select>
+              <button class="btn sm" type="button" data-rec="hotkey">Record</button></div></div>
+          <div class="set"><div class="txt"><b>Hands-free mode</b><p>Double-tap the key to keep recording without holding it; tap once more to finish.</p></div><label class="sw"><input type="checkbox" data-k="doubleTapLock"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Voice editing (Command Mode)</b><p>Select text in any app, hold the Command key and say “make this shorter”, “fix the grammar” or “translate to Hindi”. Needs a Groq or OpenAI key.</p></div><label class="sw"><input type="checkbox" data-k="commandMode"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Command key</b><p>Pick any function or right-side modifier key.</p></div>
+            <div class="ctl"><kbd class="ck">F9</kbd>
+              <select data-k="commandHotkey"><option value="F9">F9</option><option value="F8">F8</option><option value="F10">F10</option><option value="ShiftRight">Right Shift</option><option value="AltRight">Right Alt / Right Option</option><option value="">Off</option></select>
+              <button class="btn sm" type="button" data-rec="commandHotkey">Record</button></div></div>
+        </div>
+        <div class="card"><h3>Behaviour</h3>
+          <div class="set"><div class="txt"><b>Voice commands</b><p>Say “comma”, “question mark”, “new line”, “new paragraph”; or on their own: “delete that”, “press enter”, “select all”.</p></div><label class="sw"><input type="checkbox" data-k="voiceCommands"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Smart spacing</b><p>Adds a space between two dictations made back-to-back in the same app.</p></div><label class="sw"><input type="checkbox" data-k="smartSpacing"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Whisper mode</b><p>Boosts quiet speech automatically, so whispering or sitting far from the mic still works.</p></div><label class="sw"><input type="checkbox" data-k="autoGain"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Keep dictated text on the clipboard</b><p>Off restores your previous clipboard after typing. Turn on if you often dictate with no text box focused.</p></div><label class="sw"><input type="checkbox" data-k="keepInClipboard"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Start with the computer</b><p>Installed app only.</p></div><label class="sw"><input type="checkbox" data-k="launchAtLogin"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Check for updates</b><p>Installed app only. Looks for new releases on GitHub when it starts.</p></div><label class="sw"><input type="checkbox" data-k="autoUpdate"><i></i></label></div>
+        </div>
+        <div class="card"><h3>Speed &amp; flow</h3>
+          <div class="set"><div class="txt"><b>Sentence by sentence in hands-free</b><p>While you keep talking, each sentence is typed as soon as you pause for about a second.</p></div><label class="sw"><input type="checkbox" data-k="liveSegments"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Long pause = new paragraph</b><p>In hands-free mode, a pause of 2–3 seconds starts a new paragraph.</p></div><label class="sw"><input type="checkbox" data-k="pauseParagraphs"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Instant start</b><p>Keeps the microphone ready so the first word is never clipped, with 0.4 s of pre-roll. Windows shows the mic-in-use icon all the time; nothing is recorded until you press the key.</p></div><label class="sw"><input type="checkbox" data-k="micWarm"><i></i></label></div>
+        </div>
+      </section>
 
-<section class="pane" id="about"><h2>About</h2>
-  <p>Neural Flow <span id="ver"></span> — free, open-source voice dictation for any app.</p>
-  <p class="hint">Settings and history are stored in <code id="dir"></code>. API keys are encrypted with your operating system's secure storage when available. Audio is sent only to the provider you choose (or nowhere in offline mode).</p>
-</section>
+      <!-- ================= SPEECH ================= -->
+      <section class="pane" id="speech" data-title="Speech engine">
+        <div class="phead"><h1>Speech engine</h1><p>Where your voice is turned into text. Audio goes only to the engine you choose, or nowhere in offline mode.</p></div>
+        <div class="card"><h3>Engine</h3>
+          <div class="set block"><div class="ctl">
+            <select data-k="provider" data-cards>
+              <option value="groq" data-badge="Free" data-desc="Fast Whisper, no card needed">Groq Whisper</option>
+              <option value="openai" data-desc="Whisper &amp; GPT models">OpenAI</option>
+              <option value="nvidia" data-desc="Enterprise Riva speech">NVIDIA Riva</option>
+              <option value="local" data-desc="On your PC, no internet">Offline (whisper.cpp)</option>
+            </select></div></div>
+
+          <p class="note warn hidden" id="envNote">Your key was found in a <code>.env</code> file or environment variable. That only works when you run Neural Flow from source — <b>the installed app can’t see it</b>. Paste the key below to save it (encrypted) for the installed app.</p>
+          <div class="set block" data-for="groq"><div class="txt"><b>Groq API key <span class="pill" id="ks-groq">…</span></b><p>Free, no card: <a data-link="https://console.groq.com/keys">console.groq.com/keys</a>. Used for transcription and AI polish.</p></div>
+            <div class="ctl"><div class="keyrow"><input type="password" data-k="keys.groq" placeholder="gsk_…" spellcheck="false"><button class="eye" type="button" data-eye title="Show / hide"><span data-ic="eye"></span></button></div><button class="btn" data-test="groq" type="button">Test</button></div><span class="res" id="r-groq"></span></div>
+          <div class="set block" data-for="openai"><div class="txt"><b>OpenAI API key <span class="pill" id="ks-openai">…</span></b><p>From <a data-link="https://platform.openai.com/api-keys">platform.openai.com/api-keys</a>.</p></div>
+            <div class="ctl"><div class="keyrow"><input type="password" data-k="keys.openai" placeholder="sk-…" spellcheck="false"><button class="eye" type="button" data-eye title="Show / hide"><span data-ic="eye"></span></button></div><button class="btn" data-test="openai" type="button">Test</button></div><span class="res" id="r-openai"></span></div>
+          <div class="set block" data-for="nvidia"><div class="txt"><b>NVIDIA API key <span class="pill" id="ks-nvidia">…</span></b><p>From build.nvidia.com. Also needs the model’s function ID.</p></div>
+            <div class="ctl"><div class="keyrow"><input type="password" data-k="keys.nvidia" placeholder="nvapi-…" spellcheck="false"><button class="eye" type="button" data-eye title="Show / hide"><span data-ic="eye"></span></button></div></div>
+            <div class="ctl"><input type="text" data-k="nvidia.functionId" placeholder="ASR function ID"><input type="text" data-k="nvidia.lang" placeholder="en-US" style="max-width:130px"></div></div>
+          <div class="set" data-for="groq,openai"><div class="txt"><b>Model override</b><p>Optional. Leave empty for the recommended model.</p></div><input type="text" data-k="sttModel" placeholder="whisper-large-v3-turbo" style="width:250px"></div>
+        </div>
+
+        <div class="card"><h3>Language &amp; reliability</h3>
+          <div class="set"><div class="txt"><b>Spoken language</b><p>Auto-detect works well for English and Hinglish. Forcing Hindi usually returns Devanagari script.</p></div>
+            <select data-k="language"><option value="">Auto-detect</option><option value="en">English</option><option value="hi">Hindi</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="pt">Portuguese</option><option value="ar">Arabic</option><option value="ja">Japanese</option></select></div>
+          <div class="set"><div class="txt"><b>Help Whisper punctuate</b><p>English only. Primes the recogniser with a punctuated sample so commas and full stops come out better.</p></div><label class="sw"><input type="checkbox" data-k="punctuationHint"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Backup engine</b><p>If the main engine fails (rate limit, outage, bad key) it quietly retries on this one.</p></div>
+            <select data-k="sttFallback"><option value="">None</option><option value="openai">OpenAI (needs a key)</option><option value="local">Offline whisper.cpp</option></select></div>
+        </div>
+
+        <div class="card"><h3>Offline mode (whisper.cpp)</h3>
+          <p class="note">Runs Whisper on your own computer: no internet, no limits, nothing leaves your PC. Pick “Offline” above once these are set.</p>
+          <div class="set block"><div class="txt"><b>1 · Download the program</b><p>Get a <b>whisper.cpp</b> release for your OS from <a data-link="https://github.com/ggml-org/whisper.cpp/releases">github.com/ggml-org/whisper.cpp</a> and unzip it.</p></div>
+            <div class="ctl"><input type="text" data-k="local.binary" placeholder="…\whisper-cli.exe"><button class="btn" data-pick="local.binary" type="button">Browse…</button></div></div>
+          <div class="set block"><div class="txt"><b>2 · Download a model</b><p>For example <b>ggml-base.bin</b>, or <b>ggml-small.bin</b> for better accuracy, from <a data-link="https://huggingface.co/ggerganov/whisper.cpp/tree/main">huggingface.co/ggerganov/whisper.cpp</a>.</p></div>
+            <div class="ctl"><input type="text" data-k="local.model" placeholder="…\ggml-base.bin"><button class="btn" data-pick="local.model" type="button">Browse…</button></div></div>
+          <div class="set"><div class="txt"><b>CPU threads</b><p>Offline AI polish still needs a Groq or OpenAI key; turn polish off for a fully offline setup.</p></div><input type="number" min="1" max="32" data-k="local.threads"></div>
+        </div>
+      </section>
+
+      <!-- ================= CLEANUP ================= -->
+      <section class="pane" id="cleanup" data-title="AI polish">
+        <div class="phead"><h1>AI polish</h1><p>Turns what you said into what you meant: fillers gone, punctuation fixed, lists and numbers formatted.</p></div>
+        <div class="card"><h3>Polish</h3>
+          <div class="set"><div class="txt"><b>Clean up my speech</b><p>Removes “um/uh/matlab”, fixes punctuation, keeps your meaning. Uses your Groq or OpenAI key and adds about half a second.</p></div><label class="sw"><input type="checkbox" data-k="cleanup.enabled"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Default tone</b><p>Per-app rules below can override this.</p></div>
+            <select data-k="tone" data-seg><option value="neutral">Neutral</option><option value="casual">Casual</option><option value="formal">Formal</option><option value="code">Code</option></select></div>
+          <div class="set"><div class="txt"><b>Polish level</b><p>Light only removes fillers; Polished also tightens wording.</p></div>
+            <select data-k="cleanup.level" data-seg><option value="light">Light</option><option value="standard">Standard</option><option value="polished">Polished</option></select></div>
+          <div class="set"><div class="txt"><b>Smart formatting</b><p>Spoken lists become bullet, numbered or checklist lines (checkboxes in Notion and Obsidian), with paragraphs and tidy numbers. Try “first … second … third …”.</p></div><label class="sw"><input type="checkbox" data-k="smartFormatting"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Hinglish in Roman letters</b><p>Never output Devanagari; Hindi words stay as “kaise ho”.</p></div><label class="sw"><input type="checkbox" data-k="cleanup.hinglishRoman"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Translate everything I say into</b><p>Speak in one language, type in another.</p></div>
+            <select data-k="translateTo"><option value="">Off</option><option>English</option><option>Hindi</option><option>Spanish</option><option>French</option><option>German</option><option>Portuguese</option><option>Japanese</option><option>Arabic</option></select></div>
+          <div class="set block"><div class="txt"><b>My writing style</b><p>Optional. Describe how you like to sound and the AI will match it.</p></div>
+            <textarea data-k="writingStyle" spellcheck="false" style="min-height:70px" placeholder="e.g. Short sentences. Friendly but direct. No exclamation marks."></textarea></div>
+        </div>
+        <div class="card"><h3>Advanced</h3>
+          <div class="set"><div class="txt"><b>Skip polish for short phrases</b><p>Phrases with fewer words than this are typed as-is.</p></div><input type="number" min="1" max="30" data-k="cleanup.minWords"></div>
+          <div class="set"><div class="txt"><b>Polish model</b><p>A larger model gives better Command Mode edits.</p></div><input type="text" data-k="cleanup.model" placeholder="llama-3.1-8b-instant" style="width:250px"></div>
+        </div>
+        <div class="card"><h3>Per-app tone <span class="n" id="rulesN"></span></h3>
+          <div class="set block"><div class="txt"><p>Casual in Slack, formal in email, terse in code editors. Matches the program name (<code>slack</code>) or the window title (<code>title:gmail</code>).</p></div>
+            <div class="rows" id="ruleRows"></div>
+            <div class="adder"><input type="text" id="rp" placeholder="slack  or  title:gmail" spellcheck="false">
+              <select id="rt" style="min-width:130px"><option>casual</option><option>formal</option><option>neutral</option><option>code</option></select><button class="btn" id="ruleAdd" type="button">Add rule</button></div>
+            <details><summary>Edit as text</summary><textarea data-k="appRules" spellcheck="false"></textarea></details></div>
+        </div>
+      </section>
+
+      <!-- ================= WORDS ================= -->
+      <section class="pane" id="words" data-title="Words &amp; snippets">
+        <div class="phead"><h1>Words &amp; snippets</h1><p>Teach it your names, and turn short phrases into full text.</p></div>
+        <div class="card"><h3>Personal dictionary <span class="n"><span id="dictCount">0</span> entries</span></h3>
+          <div class="set block"><div class="txt"><p>Add a word to teach the recogniser its spelling, or fix something it keeps mishearing (<code>neural syntax</code> → <code>NeuralSyntax</code>).</p></div>
+            <div class="adder"><input type="text" id="dh" placeholder="Word, or what it hears" spellcheck="false"><span class="arrow">→</span><input type="text" id="dr" placeholder="Correct spelling (optional)" spellcheck="false"><button class="btn pri" id="dictAdd" type="button">Add</button></div>
+            <div class="chips" id="dictChips"></div>
+            <details><summary>Edit as text</summary><textarea data-k="dictionary" spellcheck="false" placeholder="NeuralSyntax&#10;neural syntax => NeuralSyntax"></textarea></details></div>
+        </div>
+        <div class="card"><h3>Snippets <span class="n"><span id="snipCount">0</span> snippets</span></h3>
+          <div class="set block"><div class="txt"><p>Say the trigger on its own (optionally “insert …”) and the full text is typed.</p></div>
+            <div class="rows" id="snipRows"></div>
+            <div class="adder"><input type="text" id="sn" placeholder="Trigger, e.g. my email" spellcheck="false" style="max-width:230px"><input type="text" id="sx" placeholder="Text to type" spellcheck="false"><button class="btn pri" id="snipAdd" type="button">Add</button></div>
+            <details><summary>Edit as text</summary><textarea data-k="snippets" spellcheck="false" placeholder="my email => you@example.com"></textarea></details></div>
+        </div>
+      </section>
+
+      <!-- ================= OVERLAY ================= -->
+      <section class="pane" id="overlay" data-title="Overlay &amp; sounds">
+        <div class="phead"><h1>Overlay &amp; sounds</h1><p>The little pill that shows what Neural Flow is doing.</p></div>
+        <div class="card"><h3>Live preview</h3>
+          <div class="set block"><div class="prev">
+            <span class="pp l"><span class="ic" data-ic="mic"></span>Listening <span class="w"><i style="animation-delay:0s"></i><i style="animation-delay:.12s"></i><i style="animation-delay:.24s"></i><i style="animation-delay:.36s"></i><i style="animation-delay:.18s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.06s"></i><i style="animation-delay:.42s"></i></span><small>0:04</small></span>
+            <span class="pp"><span class="ic" data-ic="spark"></span>Polishing</span>
+            <span class="pp ok"><span class="ic" data-ic="check"></span>Pasted · 12 words</span>
+            <span class="pp er"><span class="ic" data-ic="info"></span>Can’t hear you</span></div></div>
+        </div>
+        <div class="card"><h3>Appearance</h3>
+          <div class="set"><div class="txt"><b>Position</b><p>It follows you to whichever monitor you are using.</p></div>
+            <select data-k="overlayPosition" data-seg><option value="bottom">Bottom</option><option value="top">Top</option></select></div>
+          <div class="set"><div class="txt"><b>Hide when idle</b><p>Only show the pill while you are dictating.</p></div><label class="sw"><input type="checkbox" data-k="overlayHideIdle"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Sound cues</b><p>Soft sounds when recording starts, stops and finishes.</p></div><label class="sw"><input type="checkbox" data-k="soundCues"><i></i></label></div>
+        </div>
+      </section>
+
+      <!-- ================= HISTORY ================= -->
+      <section class="pane" id="history" data-title="History">
+        <div class="phead"><h1>History</h1><p>Your recent dictations, stored only on this computer. Copy anything that failed to paste.</p></div>
+        <div class="tiles"><div class="tile"><div class="v" id="hWords">0</div><div class="l">words dictated</div></div><div class="tile"><div class="v" id="hSaved">0 min</div><div class="l">saved vs typing</div></div><div class="tile"><div class="v" id="hCount">0</div><div class="l">dictations</div></div></div>
+        <div class="adder" style="margin-bottom:6px"><label class="search" style="flex:1;width:auto"><span data-ic="search"></span><input id="hq" type="text" placeholder="Search your history…" autocomplete="off"></label><button class="btn danger" id="clr" type="button">Clear all</button></div>
+        <div id="histList"></div>
+      </section>
+
+      <!-- ================= PRIVACY ================= -->
+      <section class="pane" id="privacy" data-title="Privacy &amp; data">
+        <div class="phead"><h1>Privacy &amp; data</h1><p>You decide what is kept. Nothing is uploaded except the audio you dictate.</p></div>
+        <div class="card"><h3>History</h3>
+          <div class="set"><div class="txt"><b>Privacy mode</b><p>Never save what you say to History and keep it out of logs. Word counts still feed your stats. Existing history stays until you clear it.</p></div><label class="sw"><input type="checkbox" data-k="privacyMode"><i></i></label></div>
+          <div class="set"><div class="txt"><b>Auto-delete history</b><p>Old entries are removed automatically.</p></div>
+            <select data-k="historyAutoDeleteDays"><option value="0">Keep</option><option value="1">After 1 day</option><option value="7">After 7 days</option><option value="30">After 30 days</option></select></div>
+          <div class="set"><div class="txt"><b>Delete everything now</b><p>Removes all saved dictations from this computer.</p></div><button class="btn danger" id="clr2" type="button">Clear history</button></div>
+        </div>
+        <div class="card"><h3>Where things live</h3>
+          <div class="set block"><div class="txt"><p>Settings and history are stored in <code id="dir">…</code>. API keys are encrypted with your operating system’s secure storage when available. Audio is sent only to the engine you choose, or nowhere in offline mode.</p></div></div>
+        </div>
+      </section>
+
+      <!-- ================= ABOUT ================= -->
+      <section class="pane" id="about" data-title="About">
+        <div class="phead"><h1>About</h1><p>Free, open-source voice dictation for any app.</p></div>
+        <div class="card"><h3>Neural Flow</h3>
+          <div class="set"><div class="txt"><b>Version</b><p id="ver2"></p></div><span class="pill ok">Up to date on release</span></div>
+          <div class="set"><div class="txt"><b>Made by NeuralSyntax</b><p>Learn AI &amp; coding in Hinglish on YouTube.</p></div><div class="ctl"><button class="btn" data-link="https://github.com/khushluck/Neural-Flow" type="button">GitHub</button><button class="btn" data-link="https://github.com/khushluck/Neural-Flow/issues" type="button">Report a bug</button></div></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
 </div>
-<footer><span id="msg"></span><button class="btn pri" id="save">Save</button></footer>
-</main>
+
+<!-- ================= first-run wizard ================= -->
+<div id="wiz" role="dialog" aria-modal="true" aria-label="Welcome to Neural Flow">
+  <div class="wcard">
+    <div class="wstep on" data-s="0">
+      <div class="logo" data-ic="mic"></div>
+      <h2>Welcome to <span class="g">Neural Flow</span></h2>
+      <p>Dictate in any app, in your own voice. Let’s get you set up in under a minute.</p>
+      <ul class="wlist">
+        <li><span data-ic="check"></span><span>Hold a key, speak, and clean text appears where you type</span></li>
+        <li><span data-ic="check"></span><span>Works in Hinglish, with lists, numbers and per-app tone</span></li>
+        <li><span data-ic="check"></span><span>Free to start with a Groq key; your keys stay encrypted</span></li>
+      </ul>
+    </div>
+    <div class="wstep" data-s="1">
+      <div class="logo" data-ic="cpu"></div>
+      <h2>Connect your speech engine</h2>
+      <p>Paste a free Groq API key. It turns your voice into text and powers the AI polish.</p>
+      <div class="keyrow"><input type="password" id="wk" placeholder="gsk_…" spellcheck="false" autocomplete="off"><button class="eye" type="button" data-eye title="Show / hide"><span data-ic="eye"></span></button></div>
+      <p style="margin:10px 0 0"><a data-link="https://console.groq.com/keys">Get a free key at console.groq.com/keys</a> &nbsp;·&nbsp; <span class="res" id="wres"></span></p>
+    </div>
+    <div class="wstep" data-s="2">
+      <div class="logo" data-ic="check"></div>
+      <h2>You’re all set</h2>
+      <p>Click into any text box, hold <kbd class="hk">Right Ctrl</kbd> and speak. Let go and your words appear.</p>
+      <p>You can change anything later: everything saves automatically.</p>
+    </div>
+    <div class="wnav"><div class="dots"><i class="on"></i><i></i><i></i></div>
+      <div><button class="wlink" id="wskip" type="button">Skip for now</button> <button class="btn pri" id="wnext" type="button">Get started</button></div></div>
+  </div>
+</div>
+<div id="toast"></div>
+
 <script>
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const get = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
 function set(o, p, v) { const ks = p.split('.'); ks.slice(0, -1).reduce((a, k) => (a[k] ??= {}), o)[ks.at(-1)] = v; }
-const say = (t, cls = '') => { const m = $('#msg'); m.className = cls; m.textContent = t; if (t) setTimeout(() => { if (m.textContent === t) m.textContent = ''; }, 3500); };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const isWin = /Windows/i.test(navigator.userAgent), isMac = /Mac/i.test(navigator.userAgent);
+document.body.classList.toggle('win', isWin); document.body.classList.toggle('mac', isMac);
 
+// ---------- icons ----------
+const P = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const IC = {
+  mic: P('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>'),
+  home: P('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>'),
+  keyboard: P('<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7 14h10"/>'),
+  cpu: P('<rect x="6" y="6" width="12" height="12" rx="2.5"/><path d="M9 2.5v3M15 2.5v3M9 18.5v3M15 18.5v3M2.5 9h3M2.5 15h3M18.5 9h3M18.5 15h3"/>'),
+  spark: P('<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
+  book: P('<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>'),
+  layout: P('<rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M8 21h8M12 17v4"/><rect x="8" y="12" width="8" height="2.5" rx="1.2"/>'),
+  clock: P('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/>'),
+  shield: P('<path d="M12 3l8 3v6c0 4.8-3.3 8-8 9-4.7-1-8-4.2-8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>'),
+  info: P('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5v.01"/>'),
+  search: P('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
+  eye: P('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  check: P('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  x: P('<path d="M6 6l12 12M18 6L6 18"/>'),
+};
+function icons(root = document) { $$('[data-ic]', root).forEach((e) => { if (!e.innerHTML) e.innerHTML = IC[e.dataset.ic] || ''; }); }
+icons();
+// the animated equalizer in the hero
+$('.art').innerHTML = Array.from({ length: 13 }, (_, i) => `<i style="--h:${40 + Math.round(55 * Math.abs(Math.sin(i * 0.9 + 0.4)))}px;animation-delay:${(i * 0.09).toFixed(2)}s"></i>`).join('');
+
+// ---------- toast + saved indicator ----------
+let toastT = 0;
+function toast(msg, kind = '') { const t = $('#toast'); t.className = 'show ' + kind; t.innerHTML = (kind ? IC[kind === 'err' ? 'x' : 'check'] : '') + `<span>${esc(msg)}</span>`; clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+const say = (t, cls = '') => toast(t, cls);
+let savedT = 0;
+function setSaved(state) {
+  const s = $('#saved'); clearTimeout(savedT);
+  s.className = state === 'busy' ? 'busy' : state === 'ok' ? 'ok' : '';
+  $('#savedT').textContent = state === 'busy' ? 'Saving…' : state === 'ok' ? 'All changes saved' : '\u00a0';
+  if (state === 'ok') savedT = setTimeout(() => setSaved(''), 2600);
+}
+
+// ---------- navigation ----------
+const ALIAS = { general: 'home', offline: 'speech' };
+let current = 'home';
 function tab(name) {
+  name = ALIAS[name] || name; if (!$('#' + name)) name = 'home'; current = name;
+  $('#q').value = ''; searchNow('');
   $$('.pane').forEach((p) => p.classList.toggle('on', p.id === name));
   $$('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
-  if (name === 'history') loadHistory();
+  $('#panes').scrollTop = 0;
+  if (name === 'history') loadHistory(); if (name === 'home') renderHome();
 }
-function applyProvider() {
-  const p = $('[data-k="provider"]').value;
-  $$('[data-for]').forEach((e) => { e.style.display = e.dataset.for.split(',').includes(p) ? 'block' : 'none'; });
-}
-async function load() {
-  const { settings, version, dataDir } = await nf.getSettings();
-  $$('[data-k]').forEach((el) => {
-    const v = get(settings, el.dataset.k);
-    if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
+$('#nav').onclick = (e) => { const b = e.target.closest('button'); if (b) tab(b.dataset.tab); };
+document.addEventListener('click', (e) => { const g = e.target.closest('[data-go]'); if (g) tab(g.dataset.go); });
+$('#status').onclick = () => tab('speech');
+
+// ---------- search ----------
+function searchNow(v) {
+  v = v.trim().toLowerCase();
+  document.body.classList.toggle('searching', !!v);
+  $$('.pane').forEach((p) => { if (v) p.classList.add('on'); else p.classList.toggle('on', p.id === current); });
+  $$('.set, .card, .hero, .tiles, .phead').forEach((e) => e.classList.remove('hidden'));
+  if (!v) return;
+  $('#home').classList.add('hidden'); $('#history').classList.add('hidden'); $('#about').classList.add('hidden');
+  $$('.pane').forEach((p) => {
+    if (['home', 'history', 'about'].includes(p.id)) return;
+    let any = false;
+    $$('.card', p).forEach((c) => {
+      const h = $('h3', c); if (h) h.dataset.ctx = p.dataset.title;
+      const rows = $$('.set', c); let hit = false;
+      rows.forEach((r) => { const m = r.textContent.toLowerCase().includes(v); r.classList.toggle('hidden', !m); hit ||= m; });
+      c.classList.toggle('hidden', !hit); any ||= hit;
+    });
+    p.classList.toggle('hidden', !any);
   });
-  $('#ver').textContent = 'v' + version; $('#dir').textContent = dataDir;
-  applyProvider();
 }
+$('#q').oninput = (e) => { $$('.pane').forEach((p) => p.classList.remove('hidden')); searchNow(e.target.value); };
+
+// ---------- settings load / collect / autosave ----------
+let S = null, loaded = false;
 function collect() {
   const patch = {};
   $$('[data-k]').forEach((el) => set(patch, el.dataset.k, el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value));
   return patch;
 }
-async function loadHistory() {
-  const list = await nf.getHistory(), box = $('#histList'); box.textContent = '';
-  if (!list.length) { box.innerHTML = '<p class="hint">Nothing yet — hold your hotkey and speak.</p>'; return; }
-  for (const h of list) {
-    const d = document.createElement('div'); d.className = 'hist';
-    const meta = document.createElement('small'); meta.textContent = `${new Date(h.ts).toLocaleString()}${h.app ? ' · ' + h.app : ''}${h.cleaned ? ' · cleaned' : ''}${h.kind === 'snippet' ? ' · snippet' : ''}`;
-    const p = document.createElement('p'); p.textContent = h.text;
-    const r = document.createElement('div'); r.className = 'row';
-    const cp = Object.assign(document.createElement('button'), { className: 'btn', textContent: 'Copy' });
-    cp.onclick = async () => { await nf.copy(h.text); cp.textContent = 'Copied ✓'; };
-    const del = Object.assign(document.createElement('button'), { className: 'btn', textContent: 'Delete' });
-    del.onclick = async () => { await nf.deleteHistory(h.id); loadHistory(); };
-    r.append(cp, del); d.append(meta, p, r); box.append(d);
-  }
+let saveT = 0;
+function queueSave(ms = 350) { if (!loaded) return; clearTimeout(saveT); setSaved('busy'); saveT = setTimeout(saveNow, ms); }
+async function saveNow() { clearTimeout(saveT); await nf.saveSettings(collect()); setSaved('ok'); await refreshStatus(); }
+document.addEventListener('change', (e) => { if (e.target.matches('[data-k]')) queueSave(150); });
+document.addEventListener('input', (e) => { if (e.target.matches('textarea[data-k], input[type=text][data-k], input[type=number][data-k]')) queueSave(800); });
+
+function applyProvider() {
+  const p = $('[data-k="provider"]').value;
+  $$('[data-for]').forEach((e) => { e.style.display = e.dataset.for.split(',').includes(p) ? 'flex' : 'none'; });
+  $$('.pcards .pcard').forEach((b) => b.classList.toggle('on', b.dataset.v === p));
 }
 
-$('#nav').onclick = (e) => { const b = e.target.closest('button'); if (b) tab(b.dataset.tab); };
-$('[data-k="provider"]').onchange = applyProvider;
-$('#save').onclick = async () => { await nf.saveSettings(collect()); say('Saved ✓', 'ok'); };
-$('#clr').onclick = async () => { if (confirm('Delete all history?')) { await nf.clearHistory(); loadHistory(); } };
+// segmented controls and provider cards are built from their <select>, which stays the source of truth
+function buildFancy() {
+  $$('select[data-seg]').forEach((sel) => {
+    if (sel.nextElementSibling?.classList.contains('seg')) return;
+    const box = document.createElement('div'); box.className = 'seg'; sel.after(box); sel.style.display = 'none';
+    [...sel.options].forEach((o) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = o.textContent; b.dataset.v = o.value; b.onclick = () => { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }; box.append(b); });
+  });
+  $$('select[data-cards]').forEach((sel) => {
+    if (sel.nextElementSibling?.classList.contains('pcards')) return;
+    const box = document.createElement('div'); box.className = 'pcards'; sel.after(box); sel.style.display = 'none';
+    [...sel.options].forEach((o) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pcard'; b.dataset.v = o.value;
+      b.innerHTML = `<b>${esc(o.textContent)}</b><span>${o.dataset.desc || ''}</span>${o.dataset.badge ? `<em>${esc(o.dataset.badge)}</em>` : ''}`;
+      b.onclick = () => { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }; box.append(b); });
+  });
+}
+function syncFancy() {
+  $$('select[data-seg]').forEach((sel) => [...sel.nextElementSibling.children].forEach((b) => b.classList.toggle('on', b.dataset.v === sel.value)));
+  applyProvider(); caps();
+}
+document.addEventListener('change', (e) => { if (e.target.matches('select[data-seg], select[data-k="provider"], select[data-k="hotkey"], select[data-k="commandHotkey"]')) syncFancy(); });
+
+function keyLabel(k) { const o = $(`[data-k="${k}"]`); if (!o) return ''; const opt = o.options[o.selectedIndex]; return opt && opt.value ? opt.textContent : 'Off'; }
+function caps() {
+  const hk = keyLabel('hotkey'), ck = keyLabel('commandHotkey');
+  $$('kbd.hk').forEach((e) => { e.textContent = hk; }); $$('kbd.ck').forEach((e) => { e.textContent = ck; });
+  const pr = $('#practice'); if (pr) pr.placeholder = `Click here, hold ${hk} and speak…`;
+}
+
+async function load() {
+  const r = await nf.getSettings(); S = r;
+  $$('[data-k]').forEach((el) => {
+    const v = get(r.settings, el.dataset.k);
+    if (el.type === 'checkbox') el.checked = !!v;
+    else {
+      if (el.tagName === 'SELECT' && v != null && ![...el.options].some((o) => o.value === String(v))) el.add(new Option(String(v), String(v))); // e.g. a key you recorded
+      el.value = v ?? '';
+    }
+  });
+  $('#ver').textContent = 'v' + r.version; $('#ver2').textContent = 'Neural Flow v' + r.version; $('#dir').textContent = r.dataDir;
+  buildFancy(); syncFancy(); renderDict(); renderSnips(); renderRules(); paintStatus();
+  loaded = true;
+}
+
+// ---------- key status + sidebar status ----------
+function keyState(p) { return S?.settings?.keyStatus?.[p] || ''; }
+function engineReady() {
+  const s = S?.settings; if (!s) return false;
+  if (s.provider === 'local') return !!(s.local?.binary && s.local?.model);
+  if (s.provider === 'nvidia') return !!(keyState('nvidia') && s.nvidia?.functionId);
+  return !!keyState(s.provider);
+}
+function paintStatus() {
+  const s = S.settings;
+  ['groq', 'openai', 'nvidia'].forEach((p) => {
+    const el = $('#ks-' + p); if (!el) return; const st = keyState(p);
+    el.className = 'pill ' + (st === 'saved' ? 'ok' : st === 'env' ? '' : 'bad');
+    el.textContent = st === 'saved' ? 'Saved & encrypted' : st === 'env' ? 'Found in .env — paste it here to keep it' : 'Not set';
+  });
+  $('#envNote').classList.toggle('hidden', !(keyState(s.provider) === 'env'));
+  const ok = engineReady(); const names = { groq: 'Groq', openai: 'OpenAI', nvidia: 'NVIDIA Riva', local: 'Offline' };
+  $('#status').className = ok ? 'ok' : '';
+  $('#stT').textContent = ok ? 'Ready to dictate' : 'Add your API key';
+  $('#stS').textContent = ok ? `${names[s.provider] || s.provider} connected` : 'Tap to set up your engine';
+  renderChecklist();
+}
+async function refreshStatus() {
+  const r = await nf.getSettings(); S = r;
+  $$('input[type=password][data-k]').forEach((el) => { if (document.activeElement !== el) el.value = get(r.settings, el.dataset.k) ?? ''; });
+  paintStatus();
+}
+
+// test buttons, eye toggles, links, file pickers
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-test]'), l = e.target.closest('[data-link]'), p = e.target.closest('[data-pick]');
+  const t = e.target.closest('[data-test]'), l = e.target.closest('[data-link]'), p = e.target.closest('[data-pick]'), ey = e.target.closest('[data-eye]');
   if (l) nf.openExternal(l.dataset.link);
-  if (t) { say('Testing…'); const prov = t.dataset.test; const r = await nf.testKey({ provider: prov, key: $(`[data-k="keys.${prov}"]`).value }); say(r.message, r.ok ? 'ok' : 'err'); }
-  if (p) { const f = await nf.pickFile('Choose file'); if (f) $(`[data-k="${p.dataset.pick}"]`).value = f; }
+  if (ey) { const i = ey.parentElement.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; }
+  if (t) {
+    const prov = t.dataset.test, out = $('#r-' + prov), key = $(`[data-k="keys.${prov}"]`).value;
+    out.className = 'res'; out.textContent = 'Testing…'; t.disabled = true;
+    const r = await nf.testKey({ provider: prov, key }); t.disabled = false;
+    out.className = 'res ' + (r.ok ? 'ok' : 'err'); out.textContent = r.message;
+  }
+  if (p) { const f = await nf.pickFile('Choose file'); if (f) { const el = $(`[data-k="${p.dataset.pick}"]`); el.value = f; el.dispatchEvent(new Event('change', { bubbles: true })); } }
 });
+
+// ---------- "Record a key…" ----------
+$$('[data-rec]').forEach((b) => {
+  b.onclick = async () => {
+    const sel = $(`[data-k="${b.dataset.rec}"]`), label = b.textContent;
+    b.textContent = 'Press a key…'; b.disabled = true;
+    const r = await nf.recordHotkey();
+    b.textContent = label; b.disabled = false;
+    if (r.rejected) return toast('That key gets in the way of typing. Try Right Ctrl, Right Alt, Right Shift or a function key.', 'err');
+    if (!r.name) return;
+    if (![...sel.options].some((o) => o.value === r.name)) sel.add(new Option(r.label || r.name, r.name));
+    sel.value = r.name; sel.dispatchEvent(new Event('change', { bubbles: true }));
+    toast(`Key set to ${r.label || r.name}`, 'ok');
+  };
+});
+
+// ---------- line-based editors (dictionary, snippets, per-app tone) ----------
+const fire = (ta) => ta.dispatchEvent(new Event('input', { bubbles: true }));
+const lines = (ta) => ta.value.split(/\r?\n/);
+const entries = (ta) => lines(ta).map((l, i) => ({ l, i })).filter((x) => x.l.trim() && !x.l.trim().startsWith('#'));
+function appendLine(ta, line) { ta.value = (ta.value.replace(/\s+$/, '') + '\n' + line).replace(/^\n/, ''); fire(ta); }
+function dropLine(ta, i) { const a = lines(ta); a.splice(i, 1); ta.value = a.join('\n'); fire(ta); }
+
+function renderDict() {
+  const ta = $('[data-k="dictionary"]'), box = $('#dictChips'), items = entries(ta); box.textContent = ''; $('#dictCount').textContent = items.length;
+  if (!items.length) { box.innerHTML = '<p class="empty">No words yet. Add names, brands or jargon it often gets wrong.</p>'; return; }
+  items.forEach(({ l, i }) => {
+    const m = l.split('=>'), c = document.createElement('span'); c.className = 'chip';
+    c.innerHTML = m.length > 1 ? `<span>${esc(m[0].trim())}</span><em>→</em><b>${esc(m.slice(1).join('=>').trim())}</b>` : `<b>${esc(l.trim())}</b>`;
+    const x = document.createElement('button'); x.type = 'button'; x.title = 'Remove'; x.textContent = '×'; x.onclick = () => { dropLine(ta, i); renderDict(); }; c.append(x); box.append(c);
+  });
+}
+function renderSnips() {
+  const ta = $('[data-k="snippets"]'), box = $('#snipRows'), items = entries(ta); box.textContent = ''; $('#snipCount').textContent = items.length;
+  if (!items.length) { box.innerHTML = '<p class="empty">No snippets yet. Try “my email” → your address.</p>'; return; }
+  items.forEach(({ l, i }) => {
+    const k = l.indexOf('=>'); const trig = k > -1 ? l.slice(0, k).trim() : l.trim(), body = k > -1 ? l.slice(k + 2).trim() : '';
+    const r = document.createElement('div'); r.className = 'rrow';
+    r.innerHTML = `<div class="k"><b>${esc(trig)}</b><span>${esc(body.replace(/\\n/g, ' ⏎ '))}</span></div>`;
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'btn sm danger'; x.textContent = 'Remove'; x.onclick = () => { dropLine(ta, i); renderSnips(); }; r.append(x); box.append(r);
+  });
+}
+function renderRules() {
+  const ta = $('[data-k="appRules"]'), box = $('#ruleRows'), items = entries(ta); box.textContent = ''; $('#rulesN').textContent = items.length + ' rules';
+  items.forEach(({ l, i }) => {
+    const k = l.indexOf('='); const pat = (k > -1 ? l.slice(0, k) : l).trim(), tone = k > -1 ? l.slice(k + 1).trim() : 'neutral';
+    const isTitle = pat.toLowerCase().startsWith('title:'), r = document.createElement('div'); r.className = 'rrow';
+    r.innerHTML = `<div class="k"><b>${esc(isTitle ? pat.slice(6) : pat)}${isTitle ? '<span class="tag">window title</span>' : ''}</b></div>`;
+    const sel = document.createElement('select'); ['neutral', 'casual', 'formal', 'code'].forEach((t) => sel.add(new Option(t[0].toUpperCase() + t.slice(1), t))); sel.value = tone;
+    sel.onchange = () => { const a = lines(ta); a[i] = `${pat}=${sel.value}`; ta.value = a.join('\n'); fire(ta); };
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'chip'; x.style.cssText = 'padding:0;border:0;background:none'; x.innerHTML = '<span style="display:grid;place-items:center;width:30px;height:30px;border-radius:9px;color:var(--dim)">×</span>'; x.title = 'Remove';
+    x.onclick = () => { dropLine(ta, i); renderRules(); }; r.append(sel, x); box.append(r);
+  });
+}
+$('#dictAdd').onclick = () => { const h = $('#dh').value.trim(), r = $('#dr').value.trim(); if (!h) return; appendLine($('[data-k="dictionary"]'), r ? `${h} => ${r}` : h); $('#dh').value = ''; $('#dr').value = ''; renderDict(); $('#dh').focus(); };
+$('#snipAdd').onclick = () => { const n = $('#sn').value.trim(), x = $('#sx').value.trim(); if (!n || !x) return; appendLine($('[data-k="snippets"]'), `${n} => ${x.replace(/\n/g, '\\n')}`); $('#sn').value = ''; $('#sx').value = ''; renderSnips(); };
+$('#ruleAdd').onclick = () => { const p = $('#rp').value.trim(); if (!p) return; appendLine($('[data-k="appRules"]'), `${p}=${$('#rt').value}`); $('#rp').value = ''; renderRules(); };
+[['#dh', '#dictAdd'], ['#dr', '#dictAdd'], ['#sn', '#snipAdd'], ['#sx', '#snipAdd'], ['#rp', '#ruleAdd']].forEach(([i, b]) => $(i).addEventListener('keydown', (e) => { if (e.key === 'Enter') $(b).click(); }));
+$('[data-k="dictionary"]').addEventListener('input', renderDict); $('[data-k="snippets"]').addEventListener('input', renderSnips); $('[data-k="appRules"]').addEventListener('input', renderRules);
+
+// ---------- home ----------
+function renderChecklist() {
+  if (!S) return;
+  const ok = engineReady(), polish = !!S.settings.cleanup?.enabled, tried = ($('#practice').value.trim().split(/\s+/).filter(Boolean).length >= 3);
+  const mark = (id, done) => $(id).classList.toggle('done', !!done);
+  mark('#ck1', ok); mark('#ck2', polish); mark('#ck3', tried);
+  $('#ck1 .btn').classList.toggle('hidden', ok); $('#ck2b').classList.toggle('hidden', polish);
+  const n = [ok, polish, tried].filter(Boolean).length; $('#setupN').textContent = `${n} of 3`;
+  $('#setup').classList.toggle('hidden', n === 3 && !document.body.classList.contains('searching') && false);
+}
+async function renderHome() {
+  const h = new Date().getHours(); $('#greet').textContent = h < 5 ? 'Burning the midnight oil' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const st = await nf.getStats(); $('#sWords').textContent = (st.words || 0).toLocaleString(); $('#sSaved').textContent = (st.savedMinutes || 0) + ' min'; $('#sCount').textContent = (st.count || 0).toLocaleString();
+  renderChecklist();
+}
+$('#ck2b').onclick = () => { const el = $('[data-k="cleanup.enabled"]'); el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); toast('AI polish is on', 'ok'); setTimeout(renderChecklist, 400); };
+$('#practice').addEventListener('input', renderChecklist);
+$('#heroCta').onclick = () => { tab('home'); $('#practice').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#practice').focus(); };
+
+// ---------- history ----------
+let histCache = [];
+const HUES = ['#289B9E', '#2F658E', '#51559E', '#5A3697', '#2B8A6E', '#7A4FC0'];
+const hue = (s) => { let h = 0; for (const c of s || '?') h = (h * 31 + c.charCodeAt(0)) >>> 0; return HUES[h % HUES.length]; };
+async function loadHistory() {
+  histCache = await nf.getHistory(); const st = await nf.getStats();
+  $('#hWords').textContent = (st.words || 0).toLocaleString(); $('#hSaved').textContent = (st.savedMinutes || 0) + ' min'; $('#hCount').textContent = (st.count || 0).toLocaleString();
+  renderHistory();
+}
+function hbtn(text, fn, cls = '') { const b = Object.assign(document.createElement('button'), { className: 'btn sm ' + cls, textContent: text, type: 'button' }); b.onclick = () => fn(b); return b; }
+function renderHistory() {
+  const q = $('#hq').value.trim().toLowerCase(), box = $('#histList'); box.textContent = '';
+  const list = histCache.filter((h) => !q || `${h.text} ${h.raw || ''} ${h.app || ''}`.toLowerCase().includes(q));
+  if (!list.length) { box.innerHTML = `<div class="card"><p class="empty" style="margin:18px 0">${histCache.length ? 'No matches.' : 'Nothing here yet — hold your hotkey and speak.'}</p></div>`; return; }
+  for (const h of list) {
+    const d = document.createElement('div'); d.className = 'hist';
+    const app = (h.app || 'Dictation').replace(/\.exe$/i, '');
+    const badges = [h.cleaned ? 'polished' : '', h.kind === 'snippet' ? 'snippet' : '', h.kind === 'command' ? 'voice edit' : ''].filter(Boolean).map((b) => `<span>${b}</span>`).join('');
+    d.innerHTML = `<div class="m"><div class="av" style="background:${hue(app)}">${esc(app[0])}</div><b>${esc(app)}</b><span>${new Date(h.ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span><div class="badge">${badges}</div></div>`;
+    const p = document.createElement('p'); p.textContent = h.text;
+    const r = document.createElement('div'); r.className = 'acts';
+    r.append(
+      hbtn('Copy', async (b) => { await nf.copy(h.text); b.textContent = 'Copied ✓'; }),
+      hbtn('Edit & learn', (b) => {
+        const ta = document.createElement('textarea'); ta.value = h.text; p.replaceWith(ta); b.remove();
+        r.prepend(hbtn('Save & learn', async () => { const res = await nf.learn(h.id, ta.value); toast(res.added ? `Saved — added ${res.added} to your dictionary` : 'Saved', 'ok'); loadHistory(); }, 'pri'));
+      }),
+      ...(h.raw && h.kind === 'dictation' ? [hbtn('Re-polish', async (b) => { b.textContent = 'Working…'; const res = await nf.repolish(h.id); if (!res.ok) toast(res.message || 'Failed', 'err'); loadHistory(); })] : []),
+      hbtn('Delete', async () => { await nf.deleteHistory(h.id); loadHistory(); }, 'danger'),
+    );
+    d.append(p, r); box.append(d);
+  }
+}
+$('#hq').oninput = renderHistory;
+const clearAll = async () => { if (confirm('Delete all history?')) { await nf.clearHistory(); loadHistory(); toast('History cleared', 'ok'); } };
+$('#clr').onclick = clearAll; $('#clr2').onclick = clearAll;
+
+// ---------- first-run wizard ----------
+let wstep = 0;
+function wizShow(n) {
+  wstep = n; $$('.wstep').forEach((s) => s.classList.toggle('on', +s.dataset.s === n)); $$('.dots i').forEach((d, i) => d.classList.toggle('on', i === n));
+  $('#wnext').textContent = ['Get started', 'Test & continue', 'Start dictating'][n]; $('#wskip').style.visibility = n === 2 ? 'hidden' : 'visible';
+  if (n === 1) setTimeout(() => $('#wk').focus(), 80);
+}
+function wizOpen() { $('#wiz').classList.add('on'); wizShow(0); }
+function wizClose() { $('#wiz').classList.remove('on'); try { localStorage.setItem('nf.wiz', '1'); } catch {} tab('home'); }
+$('#wskip').onclick = wizClose;
+$('#wnext').onclick = async () => {
+  if (wstep === 0) return wizShow(1);
+  if (wstep === 1) {
+    const key = $('#wk').value.trim(), out = $('#wres');
+    if (!key) { out.className = 'res err'; out.textContent = 'Paste your key first'; return; }
+    out.className = 'res'; out.textContent = 'Testing…'; $('#wnext').disabled = true;
+    const r = await nf.testKey({ provider: 'groq', key }); $('#wnext').disabled = false;
+    out.className = 'res ' + (r.ok ? 'ok' : 'err'); out.textContent = r.message;
+    if (!r.ok) return;
+    await nf.saveSettings({ provider: 'groq', keys: { groq: key } }); await load(); return wizShow(2);
+  }
+  wizClose();
+};
+$('#wk').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#wnext').click(); });
+
+// ---------- boot ----------
 nf.onTab(tab);
-load().then(() => tab(new URLSearchParams(location.search).get('tab') || 'general'));
+load().then(() => {
+  const want = new URLSearchParams(location.search).get('tab') || 'home';
+  tab(want);
+  let seen = false; try { seen = !!localStorage.getItem('nf.wiz'); } catch {}
+  if ((S.firstRun || !engineReady()) && !seen) wizOpen();
+});
 </script>
