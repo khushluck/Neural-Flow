@@ -1,81 +1,330 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="color-scheme" content="dark">
 <style>
-  :root { --bg:#131421; --border:#4E5C72; --text:#D9DEE8; --g:linear-gradient(90deg,#289B9E,#2F658E,#51559E,#5A3697); }
-  html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:500 12px Inter,system-ui,sans-serif;color:var(--text)}
-  body{display:flex;align-items:center;justify-content:center}
-  #pill{display:flex;align-items:center;justify-content:center;gap:10px;height:34px;min-width:56px;max-width:360px;padding:0 16px;
-    border-radius:17px;background:var(--bg);border:1px solid var(--border);transition:all .18s ease;opacity:.75}
-  #pill.listening{min-width:180px;opacity:1;border-color:transparent;
-    background:linear-gradient(var(--bg),var(--bg)) padding-box,var(--g) border-box;box-shadow:0 0 18px rgba(40,155,158,.25)}
-  #pill.processing{min-width:120px;opacity:1}
-  #pill.toast{min-width:150px;opacity:1;border-color:#289B9E}
-  #pill.error{min-width:200px;opacity:1;border-color:#c0505a}
-  canvas{display:none;width:120px;height:22px}
-  #pill.listening canvas{display:block}
-  #label{display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #pill.processing #label,#pill.error #label,#pill.toast #label,#pill.listening.hasmsg #label{display:block}
-  .dot{width:6px;height:6px;border-radius:50%;background:var(--g);flex:none}
-</style>
-<div id="pill"><span class="dot"></span><canvas id="wave" width="240" height="44"></canvas><span id="label"></span></div>
-<script>
-const pill = document.getElementById('pill'), label = document.getElementById('label');
-const cv = document.getElementById('wave'), g = cv.getContext('2d');
-let session = null, raf = 0, resetTimer = 0;
+  @property --a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+  :root {
+    --bg: #131421; --border: #4E5C72; --white: #FFFFFF; --body: #D9DEE8; --muted: #A9B4C7;
+    --teal: #289B9E; --blue: #2F658E; --indigo: #51559E; --purple: #5A3697; --red: #E5596A;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; user-select: none; -webkit-user-select: none;
+    font: 500 13px/1.25 Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--body); -webkit-font-smoothing: antialiased; }
 
-function setState(s, msg) {
-  clearTimeout(resetTimer);
-  pill.className = (s === 'idle' ? '' : s) + (s === 'listening' && msg ? ' hasmsg' : '');
-  label.textContent = s === 'processing' ? 'Thinking…' : (msg || '');
-  if (s === 'error') resetTimer = setTimeout(() => setState('idle'), 3500);
-  if (s === 'toast') resetTimer = setTimeout(() => setState('idle'), 2200);
+  #stage { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 9px; padding-bottom: 12px; }
+  body.top #stage { justify-content: flex-start; flex-direction: column-reverse; padding: 12px 0 0; }
+
+  /* ---------- hint caption ---------- */
+  #hint { font-size: 11.5px; color: var(--muted); padding: 4px 11px; border-radius: 11px; background: rgba(19, 20, 33, .86);
+    border: 1px solid rgba(78, 92, 114, .35); opacity: 0; transform: translateY(4px); transition: opacity .25s, transform .3s var(--ease); white-space: nowrap; }
+  #hint.show { opacity: 1; transform: none; }
+  #hint.warn { color: #F3B6BE; border-color: rgba(229, 89, 106, .45); }
+
+  /* ---------- the pill ---------- */
+  #pill { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; width: 56px; padding: 7px 8px;
+    border-radius: 22px; background: rgba(19, 20, 33, .97); border: 1px solid rgba(78, 92, 114, .55);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
+    transition: width .36s var(--ease), opacity .25s ease, transform .35s var(--ease), box-shadow .4s ease, border-color .3s;
+    opacity: .72; justify-content: center; overflow: visible; }
+  #pill.idle.hide { opacity: 0; transform: translateY(8px) scale(.9); }
+  #pill:not(.idle) { opacity: 1; justify-content: flex-start; padding: 7px 14px 7px 8px; }
+
+  /* animated gradient ring (listening / command / hands-free) */
+  #pill::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none; opacity: 0; transition: opacity .3s;
+    background: conic-gradient(from var(--a), var(--teal), var(--blue), var(--indigo), var(--purple), var(--teal));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: spin 3.2s linear infinite; }
+  #pill.listening::before { opacity: 1; }
+  #pill.command::before { background: conic-gradient(from var(--a), var(--purple), var(--indigo), #8A63D2, var(--blue), var(--purple)); }
+  #pill.handsfree::before { background: conic-gradient(from var(--a), var(--teal), #5FD0D2, var(--teal), var(--blue), var(--teal)); animation-duration: 5s; }
+  @keyframes spin { to { --a: 360deg; } }
+
+  #pill.listening { animation: breathe 2.4s ease-in-out infinite; }
+  #pill.command { --glow: 90, 54, 151; }
+  @keyframes breathe {
+    0%, 100% { box-shadow: 0 10px 30px rgba(0, 0, 0, .45), 0 0 18px rgba(var(--glow, 40, 155, 158), .26), inset 0 1px 0 rgba(255, 255, 255, .06); }
+    50%      { box-shadow: 0 10px 30px rgba(0, 0, 0, .45), 0 0 34px rgba(var(--glow, 40, 155, 158), .48), 0 0 60px rgba(90, 54, 151, .18), inset 0 1px 0 rgba(255, 255, 255, .06); }
+  }
+  #pill.success { border-color: rgba(40, 155, 158, .6); box-shadow: 0 10px 30px rgba(0, 0, 0, .45), 0 0 22px rgba(40, 155, 158, .3); }
+  #pill.error { border-color: rgba(229, 89, 106, .65); box-shadow: 0 10px 30px rgba(0, 0, 0, .45), 0 0 22px rgba(229, 89, 106, .28); }
+
+  /* ---------- icon ---------- */
+  .icon { position: relative; flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); transition: background .3s, color .3s; }
+  .icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #pill.idle .icon svg { width: 17px; height: 17px; }
+  #pill.listening .icon { color: #fff; background: linear-gradient(135deg, var(--teal), var(--blue) 45%, var(--purple)); }
+  #pill.command .icon { background: linear-gradient(135deg, var(--indigo), var(--purple)); }
+  #pill.handsfree .icon { background: linear-gradient(135deg, var(--teal), var(--blue)); }
+  #pill.success .icon { color: #fff; background: var(--teal); }
+  #pill.error .icon { color: #fff; background: var(--red); }
+  #pill.toast .icon { color: var(--teal); }
+  #pill.listening .icon::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid rgba(40, 155, 158, .55); animation: ping 1.6s ease-out infinite; }
+  #pill.command .icon::after { border-color: rgba(138, 99, 210, .6); }
+  @keyframes ping { from { transform: scale(.85); opacity: .9; } to { transform: scale(1.35); opacity: 0; } }
+  .spin { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .12); border-top-color: var(--teal); border-right-color: var(--indigo); animation: rot .8s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .draw { stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw .45s .05s var(--ease) forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  #pill.flash .icon { animation: pop .45s ease; }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+  /* ---------- content ---------- */
+  #label { font-weight: 600; color: var(--white); letter-spacing: .01em; white-space: nowrap; display: none; }
+  #pill.listening #label { color: var(--body); font-size: 12px; }
+  #pill:not(.idle) #label { display: block; }
+  #pill.error #label, #pill.toast #label { white-space: normal; max-width: 290px; }
+  #pill.error #label { color: #FBD3D8; }
+  canvas { display: none; width: 104px; height: 26px; flex: none; }
+  #pill.listening canvas { display: block; }
+  #timer { display: none; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); min-width: 32px; text-align: right; }
+  #pill.listening #timer { display: block; }
+
+  /* processing shimmer */
+  #sweep { position: absolute; left: 20px; right: 20px; bottom: 4px; height: 2px; border-radius: 2px; overflow: hidden; opacity: 0; transition: opacity .2s; }
+  #sweep::after { content: ''; position: absolute; inset: 0; width: 45%; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--teal), var(--indigo), var(--purple), transparent); animation: sweep 1.15s ease-in-out infinite; }
+  #pill.processing #sweep { opacity: 1; }
+  @keyframes sweep { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    #pill.listening, #pill::before, .icon::after, #sweep::after, .spin { animation: none !important; }
+    #pill { transition: none; }
+  }
+</style>
+
+<div id="stage">
+  <div id="hint"></div>
+  <div id="pill" class="idle" role="status" aria-live="polite">
+    <span class="icon" id="icon"></span>
+    <span id="label"></span>
+    <canvas id="wave"></canvas>
+    <span id="timer">0:00</span>
+    <span id="sweep"></span>
+  </div>
+</div>
+<span id="measure" style="position:absolute;visibility:hidden;white-space:nowrap;font:600 13px Inter,'Segoe UI',system-ui,sans-serif;letter-spacing:.01em;left:-9999px"></span>
+
+<script src="lib/segmenter.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const pill = $('pill'), label = $('label'), icon = $('icon'), timerEl = $('timer'), hint = $('hint'), cv = $('wave'), g = cv.getContext('2d');
+const cfg = { hideIdle: false, sounds: false, position: 'bottom', liveSegments: true, pauseParagraphs: false, micWarm: false };
+const st = { state: 'idle', mode: 'dictate', locked: false, label: '' };
+let session = null, raf = 0, revertT = 0, hintT = 0;
+
+// ---------- icons ----------
+const SVG = (p) => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+const ICONS = {
+  mic: SVG('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>'),
+  lock: SVG('<rect x="5" y="11" width="14" height="9" rx="2.2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+  wand: SVG('<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
+  check: SVG('<path class="draw" d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  alert: SVG('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>'),
+  info: SVG('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5v.01"/>'),
+  spinner: '<span class="spin"></span>',
+};
+
+// ---------- sound cues (optional) ----------
+let actx = null;
+function blip(freq, dur = 0.07, vol = 0.035) {
+  if (!cfg.sounds) return;
+  try {
+    actx = actx || new AudioContext();
+    const o = actx.createOscillator(), gn = actx.createGain(), t = actx.currentTime;
+    o.type = 'sine'; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * 1.25, t + dur);
+    gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gn).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch { /* sound is a nicety */ }
 }
 
-function draw() {
+// ---------- layout ----------
+const measureEl = $('measure');
+const textW = (t) => { measureEl.textContent = t || ''; return measureEl.getBoundingClientRect().width; };
+function fit() {
+  let w;
+  if (st.state === 'idle') w = 56;
+  else if (st.state === 'listening') w = 8 + 28 + 10 + textW(st.label) + 10 + 104 + 10 + 34 + 14;
+  else { const tw = Math.min(textW(st.label), 290); w = 8 + 28 + 10 + tw + 24 + (st.state === 'processing' ? 4 : 0); }
+  pill.style.width = Math.max(56, Math.min(w, 372)) + 'px';
+}
+function setIcon() {
+  const s = st.state;
+  icon.innerHTML = s === 'idle' ? ICONS.mic
+    : s === 'listening' ? (st.locked ? ICONS.lock : st.mode === 'command' ? ICONS.wand : ICONS.mic)
+    : s === 'processing' ? ICONS.spinner : s === 'success' ? ICONS.check : s === 'error' ? ICONS.alert : ICONS.info;
+}
+function showHint(text, ms = 3200, warn = false) {
+  clearTimeout(hintT);
+  hint.textContent = text; hint.classList.toggle('warn', warn); hint.classList.add('show');
+  if (ms) hintT = setTimeout(() => hint.classList.remove('show'), ms);
+}
+function render() {
+  pill.className = [st.state, st.state === 'listening' && st.mode === 'command' ? 'command' : '', st.state === 'listening' && st.locked ? 'handsfree' : '',
+    st.state === 'idle' && cfg.hideIdle ? 'hide' : ''].join(' ').replace(/\s+/g, ' ').trim();
+  document.body.classList.toggle('top', cfg.position === 'top');
+  label.textContent = st.label;
+  setIcon(); fit();
+}
+
+function setState(s, msg = '') {
+  clearTimeout(revertT);
+  const prev = st.state;
+  st.state = s;
+  if (s !== 'listening') { st.locked = false; if (prev === 'listening') hint.classList.remove('show'); }
+  if (s === 'listening') {
+    if (/^hands-?free/i.test(msg)) { st.locked = true; showHint('Tap the key to finish · Esc to cancel', 4000); }
+    st.label = st.locked ? 'Hands-free' : st.mode === 'command' ? 'Command' : 'Listening';
+  } else if (s === 'processing') st.label = msg || 'Thinking';
+  else if (s === 'success') { st.label = msg || 'Done'; revertT = setTimeout(() => setState('idle'), 1500); blip(880, 0.09); }
+  else if (s === 'toast') { st.label = msg; revertT = setTimeout(() => setState('idle'), 2600); }
+  else if (s === 'error') { st.label = msg || 'Something went wrong'; revertT = setTimeout(() => setState('idle'), 4500); blip(300, 0.14); }
+  else st.label = '';
+  render();
+}
+
+// ---------- live waveform ----------
+const N = 30, levels = new Array(N).fill(0);
+let cur = 0, lastPush = 0, quietSince = 0, warned = false;
+const dpr = Math.max(1, window.devicePixelRatio || 1);
+cv.width = Math.round(104 * dpr); cv.height = Math.round(26 * dpr);
+
+// Level source: reads the microphone analyser (kept as a plain function so it is easy to swap in demos/tests).
+function readLevel() {
   const a = session && session.analyser;
-  if (!a) return;
+  if (!a) return 0;
   const data = new Uint8Array(a.fftSize);
   a.getByteTimeDomainData(data);
   let sum = 0; for (const v of data) sum += (v - 128) ** 2;
-  const level = Math.min(1, Math.sqrt(sum / data.length) / 12); // sensitive enough for normal speech
-  g.clearRect(0, 0, cv.width, cv.height);
-  const grad = g.createLinearGradient(0, 0, cv.width, 0);
-  ['#289B9E', '#2F658E', '#51559E', '#5A3697'].forEach((c, i) => grad.addColorStop(i / 3, c));
-  g.fillStyle = grad;
-  const n = 21, w = 6, gap = 5;
-  for (let i = 0; i < n; i++) {
-    const shape = 0.35 + 0.65 * Math.abs(Math.sin(i * 0.6 + performance.now() / 180));
-    const h = Math.max(4, level * shape * cv.height);
-    g.beginPath(); g.roundRect(i * (w + gap), (cv.height - h) / 2, w, h, 3); g.fill();
-  }
-  raf = requestAnimationFrame(draw);
+  return Math.min(1, Math.sqrt(sum / data.length) / 14);
 }
 
+function drawWave(t) {
+  const W = 104, H = 26, bw = 2.6, gap = (W - N * bw) / (N - 1);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const cols = st.mode === 'command' ? ['#7C86F0', '#B08CF2', '#8A63D2'] : st.locked ? ['#289B9E', '#5FD0D2', '#2F658E'] : ['#289B9E', '#2F658E', '#51559E', '#5A3697'];
+  const grad = g.createLinearGradient(0, 0, W, 0);
+  cols.forEach((c, i) => grad.addColorStop(i / (cols.length - 1), c));
+  g.fillStyle = grad;
+  for (let i = 0; i < N; i++) {
+    const idle = 2.5 + (1 + Math.sin(t / 240 + i * 0.55)) * 0.9;           // gentle motion even in silence
+    const h = Math.max(idle, Math.pow(levels[i], 0.8) * H);
+    g.globalAlpha = 0.4 + 0.6 * (i / (N - 1));                              // newest bars are the brightest
+    g.beginPath(); g.roundRect(i * (bw + gap), (H - h) / 2, bw, h, bw / 2); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+
+function frame(t) {
+  if (st.state !== 'listening') return;
+  const target = readLevel();
+  cur += (target - cur) * (target > cur ? 0.6 : 0.16);
+  if (t - lastPush > 40) { levels.push(cur); levels.shift(); lastPush = t; }
+  drawWave(t);
+  if (session) {
+    const el = Math.floor((performance.now() - session.t0) / 1000);
+    const txt = Math.floor(el / 60) + ':' + String(el % 60).padStart(2, '0');
+    if (timerEl.textContent !== txt) timerEl.textContent = txt;
+    // Nothing but silence for a few seconds? Say so.
+    const loud = levels.some((v) => v > 0.05);
+    if (loud) { quietSince = 0; if (warned) { warned = false; hint.classList.remove('show'); } }
+    else if (!quietSince) quietSince = t;
+    else if (t - quietSince > 3000 && !warned && el >= 3) { warned = true; showHint('Can’t hear you — check your microphone', 0, true); }
+  }
+  raf = requestAnimationFrame(frame);
+}
+function enterListening(s) {
+  levels.fill(0); cur = 0; quietSince = 0; warned = false; timerEl.textContent = '0:00';
+  st.mode = s.mode;
+  setState('listening');
+  showHint(s.mode === 'command' ? 'Say what to do with the selected text' : 'Release to finish · Esc to cancel', 3200);
+  blip(660, 0.07);
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+}
+
+// ---------- microphone capture ----------
 const WORKLET = `class P extends AudioWorkletProcessor{process(i){const c=i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor('pcm',P)`;
+const PREROLL_CHUNKS = 50; // ~0.4 s of 128-sample chunks at 16 kHz
+
+// Opens the mic and an audio graph that hands every 128-sample chunk to onChunk.
+async function buildGraph(onChunk) {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+  const actx = new AudioContext({ sampleRate: 16000 });
+  try {
+    await actx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' })));
+    await actx.resume(); // contexts started from a hotkey (not a click) can begin 'suspended'
+  } catch (e) { stream.getTracks().forEach((t) => t.stop()); try { actx.close(); } catch {} throw e; }
+  const src = actx.createMediaStreamSource(stream);
+  const analyser = actx.createAnalyser(); analyser.fftSize = 512;
+  const node = new AudioWorkletNode(actx, 'pcm');
+  node.port.onmessage = (e) => onChunk(e.data);
+  src.connect(analyser); src.connect(node);
+  const mute = actx.createGain(); mute.gain.value = 0; node.connect(mute); mute.connect(actx.destination); // keeps Chromium pulling audio
+  return { stream, actx, node, analyser };
+}
+function closeGraph(g) {
+  try { g.stream && g.stream.getTracks().forEach((t) => t.stop()); } catch {}   // mic indicator off immediately
+  try { g.node && g.node.disconnect(); } catch {}
+  try { g.actx && g.actx.state !== 'closed' && g.actx.close(); } catch {}
+}
+
+// "Instant start": keep one graph open and remember the last ~0.4 s, so the first word is never clipped.
+let warm = null; // { ready, ring, session }
+function ensureWarm() {
+  if (warm) return warm.ready;
+  const w = warm = { ring: [], session: null };
+  w.ready = buildGraph((chunk) => {
+    w.ring.push(chunk); if (w.ring.length > PREROLL_CHUNKS) w.ring.shift();
+    if (w.session) onChunk(w.session, chunk);
+  }).catch((e) => { if (warm === w) warm = null; throw e; });
+  return w.ready;
+}
+function releaseWarm() { const w = warm; warm = null; if (w) w.ready.then(closeGraph).catch(() => {}); }
+
+function toPcm(chunks) {
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const pcm = new Int16Array(total); let o = 0;
+  for (const c of chunks) for (let i = 0; i < c.length; i++) pcm[o++] = Math.max(-1, Math.min(1, c[i])) * 0x7fff;
+  return pcm;
+}
+function flash() { pill.classList.add('flash'); setTimeout(() => pill.classList.remove('flash'), 450); }
+
+// Hands-free: each time you pause, send the sentence so far and keep recording.
+function flushSegment(s, r) {
+  const pcm = toPcm(s.chunks); s.chunks = [];
+  if (pcm.length < 3200) return;                       // under 0.1 s: nothing worth sending
+  s.segCount++;
+  flash(); showHint('Sentence sent ✓', 1100);
+  window.nf.sendAudio(pcm.buffer, s.mode, { segment: true, paragraph: !!(r.paragraph && cfg.pauseParagraphs) });
+}
+function onChunk(s, chunk) {
+  if (s.closed) return;
+  s.chunks.push(chunk);
+  if (cfg.liveSegments && st.locked && st.state === 'listening') { const r = s.seg.feed(chunk); if (r) flushSegment(s, r); }
+}
 
 // Each recording is its own "session", so quick tap / tap / hold sequences can never trample each other's mic or audio graph.
-function startRec() {
-  const s = { chunks: [], closed: false, stream: null, actx: null, node: null, analyser: null };
+function startRec(mode = 'dictate') {
+  const s = { mode, chunks: [], closed: false, graph: null, warm: null, analyser: null, seg: new Segmenter(), segCount: 0, t0: performance.now() };
   session = s;
   s.ready = (async () => {
     try {
-      s.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-      if (s.closed) { s.stream.getTracks().forEach((t) => t.stop()); return false; }
-      s.actx = new AudioContext({ sampleRate: 16000 });
-      await s.actx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' })));
-      await s.actx.resume(); // contexts started from a hotkey (not a click) can begin 'suspended'
-      if (s.closed) { teardown(s); return false; }
-      const src = s.actx.createMediaStreamSource(s.stream);
-      s.analyser = s.actx.createAnalyser(); s.analyser.fftSize = 512;
-      s.node = new AudioWorkletNode(s.actx, 'pcm');
-      s.node.port.onmessage = (e) => s.chunks.push(e.data);
-      src.connect(s.analyser); src.connect(s.node);
-      const mute = s.actx.createGain(); mute.gain.value = 0; s.node.connect(mute); mute.connect(s.actx.destination); // keeps Chromium pulling audio
-      if (session === s) { setState('listening'); cancelAnimationFrame(raf); draw(); }
+      let g;
+      if (cfg.micWarm) {
+        g = await ensureWarm();
+        const w = warm; if (!w) throw new Error('mic closed');
+        if (s.closed) return false;                      // the warm graph stays open for next time
+        s.chunks = w.ring.slice(); w.ring = []; w.session = s; s.warm = w;
+      } else {
+        g = await buildGraph((chunk) => onChunk(s, chunk));
+        if (s.closed) { closeGraph(g); return false; }
+      }
+      s.graph = g; s.analyser = g.analyser; s.t0 = performance.now();
+      if (session === s) enterListening(s);
       return true;
     } catch (e) {
       teardown(s);
-      if (session === s) { session = null; setState('error', 'Microphone blocked'); window.nf.recFailed(); }
+      if (session === s) { session = null; setState('error', 'Microphone blocked — check Windows privacy settings'); window.nf.recFailed(); }
       return false;
     }
   })();
@@ -83,9 +332,8 @@ function startRec() {
 
 function teardown(s) {
   s.closed = true;
-  try { s.stream && s.stream.getTracks().forEach((t) => t.stop()); } catch {}   // mic indicator off immediately
-  try { s.node && s.node.disconnect(); } catch {}
-  try { s.actx && s.actx.state !== 'closed' && s.actx.close(); } catch {}
+  if (s.warm) { if (s.warm.session === s) s.warm.session = null; s.warm.ring = []; }
+  else if (s.graph) closeGraph(s.graph);
 }
 
 async function stopRec({ tooShort, cancel } = {}) {
@@ -95,16 +343,24 @@ async function stopRec({ tooShort, cancel } = {}) {
   const ok = await s.ready;
   teardown(s);
   if (!ok) return;
-  if (tooShort || cancel) return setState('idle');
-  const total = s.chunks.reduce((n, c) => n + c.length, 0);
-  const pcm = new Int16Array(total); let o = 0;
-  for (const c of s.chunks) for (let i = 0; i < c.length; i++) pcm[o++] = Math.max(-1, Math.min(1, c[i])) * 0x7fff;
-  setState('processing');
-  window.nf.sendAudio(pcm.buffer);
+  hint.classList.remove('show');
+  if (cancel) { blip(300, 0.1); return setState('idle'); }
+  const sent = s.segCount > 0, fin = s.seg.finish();
+  if (!sent && tooShort) return setState('idle');
+  if (sent && !fin.hasSpeech) return setState('idle');   // every sentence was already typed as you went
+  const pcm = toPcm(s.chunks);
+  blip(500, 0.07);
+  setState('processing', s.mode === 'command' ? 'Reading selection' : 'Transcribing');
+  window.nf.sendAudio(pcm.buffer, s.mode, { segment: sent, paragraph: !!(fin.paragraph && cfg.pauseParagraphs) });
 }
 
 // While a recording is in progress, ignore late 'idle/processing/toast' updates from the previous utterance.
-window.nf.on('state', (st, msg) => { if (session && st !== 'listening' && st !== 'error') return; setState(st, msg); });
+window.nf.on('state', (state, msg) => { if (session && state !== 'listening' && state !== 'error') return; setState(state, msg); });
 window.nf.on('rec:start', startRec);
 window.nf.on('rec:stop', stopRec);
+window.nf.on('config', (c) => {
+  Object.assign(cfg, c || {}); render();
+  if (cfg.micWarm) ensureWarm().catch(() => {}); else if (!session) releaseWarm();
+});
+render();
 </script>
