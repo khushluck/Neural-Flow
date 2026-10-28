@@ -1,7 +1,7 @@
 {
   "name": "neural-flow",
   "productName": "Neural Flow",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Free, open-source voice dictation for any app: hold a key, speak, and clean text appears where you are typing.",
   "main": "main.js",
   "author": "NeuralSyntax",
@@ -11,14 +11,14 @@
     "test": "node --test test/*.test.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist:mac": "electron-builder --mac"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
     "@grpc/proto-loader": "^0.7.13",
     "dotenv": "^16.4.5",
-    "uiohook-napi": "^1.5.4"
+    "uiohook-napi": "^1.5.4",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -68,38 +68,21 @@
       "allowToChangeInstallationDirectory": true
     },
     "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ],
+      "target": "dmg",
       "category": "public.app-category.productivity",
       "icon": "assets/icon.png",
       "hardenedRuntime": false,
       "identity": null,
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Neural Flow needs the microphone to hear your dictation."
-      },
-      "artifactName": "Neural-Flow-${version}-mac-${arch}.${ext}"
+      }
     },
-    "afterPack": "build/afterPack.js",
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "category": "Utility",
-      "icon": "assets/icon.png",
-      "synopsis": "Voice dictation for any app",
-      "artifactName": "Neural-Flow-${version}-linux-${arch}.${ext}"
-    }
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "khushluck",
+        "repo": "Neural-Flow"
+      }
+    ]
   }
 }
