@@ -50,7 +50,7 @@ test('cleanup failure falls back to the raw transcript', async () => {
 });
 
 test('short utterances skip cleanup; disabled cleanup skips it too', async () => {
-  let h = harness({ transcript: 'okay sounds good' });
+  let h = harness({ transcript: 'okay' }); // 1 word < minWords (default 2)
   await processAudio(pcm(), h.ctx);
   assert.strictEqual(h.calls.cleanInputs.length, 0);
   h = harness({ settings: { cleanup: { ...DEFAULTS.cleanup, enabled: false } } });
